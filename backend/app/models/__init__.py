@@ -1,0 +1,12 @@
+"""
+统一导入所有 ORM Model。
+
+Alembic 在执行 autogenerate 时，需要所有 ORM Model
+都已经被导入，从而注册到 Base.metadata 中。
+"""
+
+from app.models.rating_item import RatingItemModel
+
+__all__ = [
+    "RatingItemModel",
+]

@@ -1,6 +1,9 @@
-from datetime import datetime
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
+from app.models.rating_item import RatingItemModel
 from app.schemas.rating import (
     CreateRatingItemRequest,
     PageResult,
@@ -10,123 +13,177 @@ from app.schemas.rating import (
 
 
 class RatingService:
-    """评分项目业务服务。"""
+    """
+    评分项目业务服务。
+    """
 
-    def __init__(self) -> None:
-        self._items: list[RatingItemResponse] = [
-            RatingItemResponse(
-                id=1,
-                name="回答准确性",
-                description="用于评估模型回答内容是否准确。",
-                status=RatingStatus.INITIALIZED,
-                create_time=datetime.now(),
-                update_time=datetime.now(),
-            ),
-            RatingItemResponse(
-                id=2,
-                name="回答完整性",
-                description="用于评估回答是否完整覆盖用户问题。",
-                status=RatingStatus.RATING,
-                create_time=datetime.now(),
-                update_time=datetime.now(),
-            ),
-            RatingItemResponse(
-                id=3,
-                name="回答相关性",
-                description="用于评估回答与用户问题之间的相关程度。",
-                status=RatingStatus.RATED,
-                create_time=datetime.now(),
-                update_time=datetime.now(),
-            ),
-        ]
-
-        self._next_id = 4
+    def __init__(self, db: Session) -> None:
+        # 当前请求对应的数据库 Session。
+        self.db = db
 
     def list_items(
-        self,
-        *,
-        name: str | None,
-        status: RatingStatus | None,
-        page: int,
-        page_size: int,
+            self,
+            *,
+            name: str | None,
+            status: RatingStatus | None,
+            page: int,
+            page_size: int,
     ) -> PageResult[RatingItemResponse]:
         """
-        查询评分项目列表。
+        分页查询评分项目。
         """
 
-        items = self._items
+        # -------------------------
+        # 构建查询条件
+        # -------------------------
 
-        # 名称模糊搜索
+        conditions = []
+
         if name:
-            keyword = name.strip().lower()
+            keyword = name.strip()
 
-            items = [
-                item
-                for item in items
-                if keyword in item.name.lower()
-            ]
+            if keyword:
+                # 项目名称模糊查询。
+                conditions.append(
+                    RatingItemModel.name.ilike(
+                        f"%{keyword}%"
+                    )
+                )
 
-        # 状态过滤
         if status is not None:
-            items = [
-                item
-                for item in items
-                if item.status == status
-            ]
+            # 注意：
+            # status=0 是合法状态，
+            # 因此不能写 if status。
+            conditions.append(
+                RatingItemModel.status == int(status)
+            )
 
-        total = len(items)
+        # -------------------------
+        # 查询总记录数
+        # -------------------------
 
-        start = (page - 1) * page_size
-        end = start + page_size
+        count_stmt = select(
+            func.count(RatingItemModel.id)
+        )
 
-        page_items = items[start:end]
+        if conditions:
+            count_stmt = count_stmt.where(
+                *conditions
+            )
+
+        total = self.db.scalar(
+            count_stmt
+        ) or 0
+
+        # -------------------------
+        # 查询当前页数据
+        # -------------------------
+
+        stmt = select(
+            RatingItemModel
+        )
+
+        if conditions:
+            stmt = stmt.where(
+                *conditions
+            )
+
+        # 默认按 ID 倒序，
+        # 新创建的数据优先显示。
+        stmt = (
+            stmt
+            .order_by(RatingItemModel.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+
+        items = self.db.scalars(
+            stmt
+        ).all()
+
+        # SQLAlchemy ORM Model
+        # 转换为 Pydantic Response Model。
+        response_items = [
+            RatingItemResponse.model_validate(item)
+            for item in items
+        ]
 
         return PageResult(
-            list=page_items,
+            list=response_items,
             total=total,
             page=page,
             page_size=page_size,
         )
 
     def create_item(
-        self,
-        request: CreateRatingItemRequest,
+            self,
+            request: CreateRatingItemRequest,
     ) -> RatingItemResponse:
         """
         创建评分项目。
         """
 
-        # 名称唯一性校验
-        normalized_name = request.name.strip().lower()
+        # -------------------------
+        # 检查名称是否已经存在
+        # -------------------------
 
-        exists = any(
-            item.name.strip().lower() == normalized_name
-            for item in self._items
+        exists_stmt = (
+            select(RatingItemModel.id)
+            .where(
+                RatingItemModel.name == request.name
+            )
+            .limit(1)
         )
 
-        if exists:
+        exists_id = self.db.scalar(
+            exists_stmt
+        )
+
+        if exists_id is not None:
             raise BusinessException(
                 code=10001,
                 message="评分项目名称已存在",
                 status_code=409,
             )
 
-        now = datetime.now()
+        # -------------------------
+        # 创建 ORM 对象
+        # -------------------------
 
-        item = RatingItemResponse(
-            id=self._next_id,
+        item = RatingItemModel(
             name=request.name,
             description=request.description,
-            status=RatingStatus.INITIALIZED,
-            create_time=now,
-            update_time=now,
+
+            # 新增项目固定为初始化状态。
+            status=int(
+                RatingStatus.INITIALIZED
+            ),
         )
 
-        self._items.append(item)
+        self.db.add(item)
 
-        self._next_id += 1
+        try:
+            # 提交事务。
+            self.db.commit()
 
-        return item
+        except IntegrityError:
+            # 数据库约束异常必须 rollback，
+            # 否则当前 Session 会保持失败状态。
+            self.db.rollback()
 
+            # 即使前面已经检查名称是否重复，
+            # 高并发情况下仍可能在检查后被其他事务插入。
+            # 因此数据库 UNIQUE 约束仍然是最终保障。
+            raise BusinessException(
+                code=10001,
+                message="评分项目名称已存在",
+                status_code=409,
+            )
 
-rating_service = RatingService()
+        # 重新读取数据库生成的字段：
+        # id、create_time、update_time 等。
+        self.db.refresh(item)
+
+        return RatingItemResponse.model_validate(
+            item
+        )

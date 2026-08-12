@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { RatingItem } from '@/types'
@@ -153,26 +153,7 @@ const pagination = reactive<Pagination>({
   total: 3,
 })
 
-const tableData = ref<RatingItem[]>([
-  {
-    id: 1,
-    name: '回答准确性',
-    description: '用于评估模型回答内容是否准确，是否存在事实性错误。',
-    status: 0,
-  },
-  {
-    id: 2,
-    name: '回答完整性',
-    description: '用于评估回答是否完整覆盖用户问题中的关键信息。',
-    status: 1,
-  },
-  {
-    id: 3,
-    name: '相关性',
-    description: '用于评估回答内容与用户问题之间的相关程度。',
-    status: 2,
-  },
-])
+const tableData = ref<RatingItem[]>([])
 
 /**
  * 查询
@@ -289,6 +270,10 @@ function handlePageChange(page: number) {
 
   loadData()
 }
+
+onMounted(() => {
+  loadData()
+})
 </script>
 
 <style scoped>

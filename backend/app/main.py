@@ -2,12 +2,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 
 
 def create_app() -> FastAPI:
+    """
+    创建 FastAPI 应用实例。
+    """
+
     app = FastAPI(
-        title="Rating System API",
+        title=settings.app_name,
         description="Rating System Backend API",
         version="0.1.0",
     )
@@ -28,13 +33,13 @@ def create_app() -> FastAPI:
     )
 
     # -------------------------
-    # 全局异常
+    # 注册全局异常处理
     # -------------------------
 
     register_exception_handlers(app)
 
     # -------------------------
-    # API Router
+    # 注册 API Router
     # -------------------------
 
     app.include_router(api_router)

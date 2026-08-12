@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
+from app.database.session import SessionDep
 from app.schemas.common import ApiResponse
 from app.schemas.rating import (
     CreateRatingItemRequest,
@@ -9,7 +10,7 @@ from app.schemas.rating import (
     RatingItemResponse,
     RatingStatus,
 )
-from app.services.rating_service import rating_service
+from app.services.rating_service import RatingService
 
 
 router = APIRouter(
@@ -17,11 +18,16 @@ router = APIRouter(
     tags=["Rating"],
 )
 
+
 @router.get(
     "/items",
-    response_model=ApiResponse[PageResult[RatingItemResponse]],
+    response_model=ApiResponse[
+        PageResult[RatingItemResponse]
+    ],
 )
-async def get_rating_item_list(
+def get_rating_item_list(
+    db: SessionDep,
+
     name: Annotated[
         str | None,
         Query(
@@ -29,6 +35,7 @@ async def get_rating_item_list(
             description="项目名称",
         ),
     ] = None,
+
     status_: Annotated[
         RatingStatus | None,
         Query(
@@ -36,6 +43,7 @@ async def get_rating_item_list(
             description="项目状态",
         ),
     ] = None,
+
     page: Annotated[
         int,
         Query(
@@ -43,6 +51,7 @@ async def get_rating_item_list(
             description="页码",
         ),
     ] = 1,
+
     page_size: Annotated[
         int,
         Query(
@@ -52,8 +61,16 @@ async def get_rating_item_list(
             description="每页数量",
         ),
     ] = 10,
-) -> ApiResponse[PageResult[RatingItemResponse]]:
-    result = rating_service.list_items(
+) -> ApiResponse[
+    PageResult[RatingItemResponse]
+]:
+    """
+    分页查询评分项目。
+    """
+
+    service = RatingService(db)
+
+    result = service.list_items(
         name=name,
         status=status_,
         page=page,
@@ -64,15 +81,27 @@ async def get_rating_item_list(
         data=result,
     )
 
+
 @router.post(
     "/addItem",
-    response_model=ApiResponse[RatingItemResponse],
+    response_model=ApiResponse[
+        RatingItemResponse
+    ],
     status_code=status.HTTP_201_CREATED,
 )
-async def create_rating_item(
+def create_rating_item(
     request: CreateRatingItemRequest,
+    db: SessionDep,
 ) -> ApiResponse[RatingItemResponse]:
-    item = rating_service.create_item(request)
+    """
+    新增评分项目。
+    """
+
+    service = RatingService(db)
+
+    item = service.create_item(
+        request
+    )
 
     return ApiResponse(
         message="新增成功",
