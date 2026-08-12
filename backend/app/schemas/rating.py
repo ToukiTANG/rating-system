@@ -75,6 +75,59 @@ class RatingItemResponse(BaseModel):
     )
 
 
+class UpdateRatingItemRequest(BaseModel):
+    """
+    修改评分项目请求。
+    """
+
+    # 需要修改的评分项目 ID。
+    id: int = Field(
+        ge=1,
+        description="评分项目 ID",
+    )
+
+    # 项目名称。
+    name: str = Field(
+        min_length=1,
+        max_length=50,
+        description="项目名称",
+    )
+
+    # 项目描述。
+    description: str = Field(
+        default="",
+        max_length=500,
+        description="项目描述",
+    )
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        """
+        去除项目名称首尾空格，
+        并禁止名称仅包含空白字符。
+        """
+
+        value = value.strip()
+
+        if not value:
+            raise ValueError("项目名称不能为空")
+
+        return value
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(
+            cls,
+            value: str,
+    ) -> str:
+        """
+        去除项目描述首尾空格。
+        """
+
+        return value.strip()
+
+
 T = TypeVar("T")
 
 

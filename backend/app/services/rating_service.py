@@ -9,6 +9,7 @@ from app.schemas.rating import (
     PageResult,
     RatingItemResponse,
     RatingStatus,
+    UpdateRatingItemRequest,
 )
 
 
@@ -182,6 +183,91 @@ class RatingService:
 
         # 重新读取数据库生成的字段：
         # id、create_time、update_time 等。
+        self.db.refresh(item)
+
+        return RatingItemResponse.model_validate(
+            item
+        )
+
+    def update_item(
+            self,
+            request: UpdateRatingItemRequest,
+    ) -> RatingItemResponse:
+        """
+        修改评分项目。
+        """
+
+        # -------------------------
+        # 查询待修改的评分项目
+        # -------------------------
+
+        stmt = (
+            select(RatingItemModel)
+            .where(
+                RatingItemModel.id == request.id
+            )
+        )
+
+        item = self.db.scalar(stmt)
+
+        if item is None:
+            raise BusinessException(
+                code=10002,
+                message="评分项目不存在",
+                status_code=404,
+            )
+
+        # -------------------------
+        # 检查名称是否被其他记录占用
+        # -------------------------
+
+        duplicate_stmt = (
+            select(RatingItemModel.id)
+            .where(
+                RatingItemModel.name == request.name,
+
+                # 排除当前正在修改的记录。
+                RatingItemModel.id != request.id,
+            )
+            .limit(1)
+        )
+
+        duplicate_id = self.db.scalar(
+            duplicate_stmt
+        )
+
+        if duplicate_id is not None:
+            raise BusinessException(
+                code=10001,
+                message="评分项目名称已存在",
+                status_code=409,
+            )
+
+        # -------------------------
+        # 更新允许编辑的字段
+        # -------------------------
+
+        item.name = request.name
+        item.description = request.description
+
+        # status 属于系统状态，
+        # 普通修改接口不允许直接修改。
+        try:
+            self.db.commit()
+
+        except IntegrityError:
+            # 数据库操作失败后必须回滚，
+            # 否则 Session 会保持失败状态。
+            self.db.rollback()
+
+            raise BusinessException(
+                code=10001,
+                message="评分项目名称已存在",
+                status_code=409,
+            )
+
+        # 获取数据库中的最新值，
+        # 包括自动更新的 update_time。
         self.db.refresh(item)
 
         return RatingItemResponse.model_validate(

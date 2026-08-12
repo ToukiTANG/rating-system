@@ -1,32 +1,5 @@
 import { get, post } from '../request'
-
-export type RatingStatus = 0 | 1 | 2
-
-export interface SearchForm {
-  name: string
-  status: null | RatingStatus
-}
-
-export interface RatingItem {
-  id: number
-  name: string
-  description: string
-  status: RatingStatus
-  createTime: string
-  updateTime: string
-}
-
-export interface RatingItemQuery {
-  name?: string
-  status?: RatingStatus
-  page: number
-  pageSize: number
-}
-
-export interface PageResult<T> {
-  list: T[]
-  total: number
-}
+import type { RatingItemQuery, PageResult, RatingItem, UpdateRatingItemRequest } from '@/types'
 
 /**
  * 获取评分项目列表
@@ -45,13 +18,13 @@ export function createRatingItem(data: Partial<RatingItem>) {
 /**
  * 修改评分项目
  */
-export function updateRatingItem(data: Partial<RatingItem>) {
-  return post<RatingItem>(`/rating/updateItem`, data)
+export function updateRatingItem(data: UpdateRatingItemRequest) {
+  return post<RatingItem>('/rating/updateItem', data)
 }
 
 /**
  * 删除评分项目
  */
 export function deleteRatingItem(id: number) {
-  return post<void>(`/rating/deleteItems`,id)
+  return post<void>(`/rating/deleteItems`, id)
 }

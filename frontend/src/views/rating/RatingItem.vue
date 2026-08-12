@@ -4,24 +4,14 @@
     <section class="search-panel">
       <el-form :model="searchForm" inline class="search-form" @submit.prevent>
         <el-form-item label="项目名称">
-          <el-input
-            v-model="searchForm.name"
-            placeholder="请输入项目名称"
-            clearable
-            style="width: 220px"
-            @keyup.enter="handleSearch"
-          />
+          <el-input v-model="searchForm.name" placeholder="请输入项目名称" clearable style="width: 220px" @keyup.enter="handleSearch" />
         </el-form-item>
 
         <el-form-item label="状态">
-          <el-select
-            v-model="searchForm.status"
-            placeholder="请选择状态"
-            clearable
-            style="width: 160px"
-          >
-            <el-option label="启用" value="enabled" />
-            <el-option label="停用" value="disabled" />
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 160px">
+            <el-option label="初始化" :value="0" />
+            <el-option label="评分中" :value="1" />
+            <el-option label="已评分" :value="2" />
           </el-select>
         </el-form-item>
 
@@ -57,12 +47,7 @@
 
         <el-table-column prop="name" label="项目名称" min-width="150" show-overflow-tooltip />
 
-        <el-table-column
-          prop="description"
-          label="项目描述"
-          min-width="260"
-          show-overflow-tooltip
-        />
+        <el-table-column prop="description" label="项目描述" min-width="260" show-overflow-tooltip />
 
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
@@ -72,12 +57,9 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="updateTime" label="更新时间" width="180" align="center" />
-
         <el-table-column label="操作" width="180" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" link @click="handleEdit(row)"> 编辑 </el-button>
-
+            <el-button type="primary" :disabled="row.status !== 0" link @click="handleEdit(row)"> 编辑 </el-button>
             <el-button type="danger" link @click="handleDelete(row)"> 删除 </el-button>
           </template>
         </el-table-column>
@@ -100,7 +82,7 @@
         />
       </div>
     </section>
-    <AddDialog v-model="addDialogVisible" @success="handleAddSuccess" />
+    <AddOrUpdate v-model="dialogVisible" :item="currentItem" @success="handleAddOrUpdateSuccess" />
   </div>
 </template>
 
@@ -108,9 +90,9 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import type { RatingItem } from '@/types'
-import { getRatingItemList, type SearchForm } from '@/api/rating/rating.ts'
-import AddDialog from '@/views/rating/AddDialog.vue'
+import type { RatingItem, SearchForm } from '@/types'
+import { getRatingItemList } from '@/api/rating/rating.ts'
+import AddOrUpdate from '@/views/rating/AddOrUpdate.vue'
 
 interface Pagination {
   page: number
@@ -138,7 +120,7 @@ const statusMap: Record<number, StatusInfo> = {
   },
 }
 
-const addDialogVisible = ref(false)
+const dialogVisible = ref(false)
 
 const loading = ref(false)
 
@@ -154,6 +136,17 @@ const pagination = reactive<Pagination>({
 })
 
 const tableData = ref<RatingItem[]>([])
+
+/**
+ * 当前正在编辑的评分项目。
+ *
+ * null：
+ *   表示新增模式。
+ *
+ * RatingItem：
+ *   表示编辑模式。
+ */
+const currentItem = ref<RatingItem | null>(null)
 
 /**
  * 查询
@@ -177,15 +170,6 @@ function handleReset() {
   searchForm.name = ''
   searchForm.status = null
 
-  pagination.page = 1
-
-  loadData()
-}
-
-/**
- * 处理新增成功刷新数据
- */
-function handleAddSuccess() {
   pagination.page = 1
 
   loadData()
@@ -217,17 +201,50 @@ async function loadData() {
 }
 
 /**
- * 新增
+ * 打开新增弹窗。
  */
 function handleAdd() {
-  addDialogVisible.value = true
+  // 新增时必须清空当前编辑对象，
+  // AddOrUpdate 会据此判断当前是新增模式。
+  currentItem.value = null
+
+  dialogVisible.value = true
 }
 
 /**
- * 编辑
+ * 打开编辑弹窗。
  */
 function handleEdit(row: RatingItem) {
-  console.log('编辑评分项目:', row)
+  /**
+   * 建议复制一份 row。
+   *
+   * 避免子组件修改表单时，
+   * 意外直接影响表格中的原始对象。
+   */
+  currentItem.value = {
+    ...row,
+  }
+
+  dialogVisible.value = true
+}
+
+/**
+ * 新增 / 修改成功后的统一处理。
+ */
+function handleAddOrUpdateSuccess(mode: 'add' | 'edit') {
+  /**
+   * 新增数据通常按 ID 倒序排列，
+   * 因此新增成功后跳到第一页，
+   * 方便立即看到刚新增的数据。
+   */
+  if (mode === 'add') {
+    pagination.page = 1
+  }
+
+  /**
+   * 重新查询数据库中的最新数据。
+   */
+  loadData()
 }
 
 /**
