@@ -1,0 +1,379 @@
+<template>
+  <div class="rating-item-page">
+    <!-- 搜索区域 -->
+    <section class="search-panel">
+      <el-form :model="searchForm" inline class="search-form" @submit.prevent>
+        <el-form-item label="项目名称">
+          <el-input
+            v-model="searchForm.name"
+            placeholder="请输入项目名称"
+            clearable
+            style="width: 220px"
+            @keyup.enter="handleSearch"
+          />
+        </el-form-item>
+
+        <el-form-item label="状态">
+          <el-select
+            v-model="searchForm.status"
+            placeholder="请选择状态"
+            clearable
+            style="width: 160px"
+          >
+            <el-option label="启用" value="enabled" />
+            <el-option label="停用" value="disabled" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch"> 查询 </el-button>
+
+          <el-button @click="handleReset"> 重置 </el-button>
+        </el-form-item>
+      </el-form>
+    </section>
+
+    <!-- 表格区域 -->
+    <section class="table-panel">
+      <!-- 表格顶部工具栏 -->
+      <div class="table-toolbar">
+        <div class="toolbar-left">
+          <span class="table-title">评分项目列表</span>
+        </div>
+
+        <div class="toolbar-right">
+          <el-button type="primary" @click="handleAdd">
+            <el-icon>
+              <Plus />
+            </el-icon>
+            新增评分项目
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 表格 -->
+      <el-table :data="tableData" v-loading="loading" border stripe style="width: 100%">
+        <el-table-column type="index" label="序号" width="70" align="center" />
+
+        <el-table-column prop="name" label="项目名称" min-width="150" show-overflow-tooltip />
+
+        <el-table-column
+          prop="description"
+          label="项目描述"
+          min-width="260"
+          show-overflow-tooltip
+        />
+
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="statusMap[row.status]?.type">
+              {{ statusMap[row.status]?.label ?? '未知状态' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="updateTime" label="更新时间" width="180" align="center" />
+
+        <el-table-column label="操作" width="180" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button type="primary" link @click="handleEdit(row)"> 编辑 </el-button>
+
+            <el-button type="danger" link @click="handleDelete(row)"> 删除 </el-button>
+          </template>
+        </el-table-column>
+
+        <template #empty>
+          <el-empty description="暂无评分项目" />
+        </template>
+      </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handlePageSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
+    </section>
+    <AddDialog v-model="addDialogVisible" @success="handleAddSuccess" />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
+import type { RatingItem } from '@/types'
+import { getRatingItemList, type SearchForm } from '@/api/rating/rating.ts'
+import AddDialog from '@/views/rating/AddDialog.vue'
+
+interface Pagination {
+  page: number
+  pageSize: number
+  total: number
+}
+
+type StatusInfo = {
+  label: string
+  type: 'info' | 'warning' | 'success'
+}
+
+const statusMap: Record<number, StatusInfo> = {
+  0: {
+    label: '初始化',
+    type: 'info',
+  },
+  1: {
+    label: '评分中',
+    type: 'warning',
+  },
+  2: {
+    label: '已评分',
+    type: 'success',
+  },
+}
+
+const addDialogVisible = ref(false)
+
+const loading = ref(false)
+
+const searchForm = reactive<SearchForm>({
+  name: '',
+  status: null,
+})
+
+const pagination = reactive<Pagination>({
+  page: 1,
+  pageSize: 10,
+  total: 3,
+})
+
+const tableData = ref<RatingItem[]>([
+  {
+    id: 1,
+    name: '回答准确性',
+    description: '用于评估模型回答内容是否准确，是否存在事实性错误。',
+    status: 0,
+  },
+  {
+    id: 2,
+    name: '回答完整性',
+    description: '用于评估回答是否完整覆盖用户问题中的关键信息。',
+    status: 1,
+  },
+  {
+    id: 3,
+    name: '相关性',
+    description: '用于评估回答内容与用户问题之间的相关程度。',
+    status: 2,
+  },
+])
+
+/**
+ * 查询
+ */
+function handleSearch() {
+  pagination.page = 1
+
+  console.log('搜索条件:', {
+    ...searchForm,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+  })
+
+  loadData()
+}
+
+/**
+ * 重置查询条件
+ */
+function handleReset() {
+  searchForm.name = ''
+  searchForm.status = null
+
+  pagination.page = 1
+
+  loadData()
+}
+
+/**
+ * 处理新增成功刷新数据
+ */
+function handleAddSuccess() {
+  pagination.page = 1
+
+  loadData()
+}
+
+/**
+ * 加载数据
+ */
+async function loadData() {
+  loading.value = true
+
+  try {
+    // 后续这里替换成真实 API
+    //
+    const response = await getRatingItemList({
+      name: searchForm.name || undefined,
+      status: searchForm.status || undefined,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    })
+
+    tableData.value = response.list
+    pagination.total = response.total
+
+    console.log('load rating items')
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 新增
+ */
+function handleAdd() {
+  addDialogVisible.value = true
+}
+
+/**
+ * 编辑
+ */
+function handleEdit(row: RatingItem) {
+  console.log('编辑评分项目:', row)
+}
+
+/**
+ * 删除
+ */
+async function handleDelete(row: RatingItem) {
+  try {
+    await ElMessageBox.confirm(`确认删除评分项目「${row.name}」吗？`, '删除确认', {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+
+    // 后续替换成真实删除 API
+    tableData.value = tableData.value.filter((item) => item.id !== row.id)
+
+    pagination.total = tableData.value.length
+
+    ElMessage.success('删除成功')
+  } catch {
+    // 用户取消，不需要处理
+  }
+}
+
+/**
+ * 修改每页数量
+ */
+function handlePageSizeChange(pageSize: number) {
+  pagination.pageSize = pageSize
+  pagination.page = 1
+
+  loadData()
+}
+
+/**
+ * 翻页
+ */
+function handlePageChange(page: number) {
+  pagination.page = page
+
+  loadData()
+}
+</script>
+
+<style scoped>
+.rating-item-page {
+  display: flex;
+  flex-direction: column;
+
+  gap: 16px;
+
+  width: 100%;
+  height: 100%;
+
+  box-sizing: border-box;
+}
+
+/* =========================
+   搜索区域
+========================= */
+
+.search-panel {
+  padding: 20px 20px 2px;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+
+  box-sizing: border-box;
+}
+
+.search-form {
+  width: 100%;
+}
+
+/* =========================
+   表格区域
+========================= */
+
+.table-panel {
+  flex: 1;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 20px;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+
+  box-sizing: border-box;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 16px;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+}
+
+.table-title {
+  font-size: 16px;
+  font-weight: 600;
+
+  color: #303133;
+}
+
+/* =========================
+   分页
+========================= */
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+
+  margin-top: auto;
+  padding-top: 20px;
+}
+</style>

@@ -9,6 +9,30 @@ const router = createRouter({
       component: MainLayout,
 
       children: [
+        {
+          path: '',
+          name: 'home',
+          component: () => import('@/views/HomeView.vue'),
+          meta: {
+            title: '首页',
+          },
+        },
+        {
+          path: 'ratingItem',
+          name: 'ratingItem',
+          component: () => import('@/views/rating/RatingItem.vue'),
+          meta: {
+            title: '评分项目',
+          },
+        },
+        {
+          path: 'setting',
+          name: 'setting',
+          component: () => import('@/views/SettingView.vue'),
+          meta: {
+            title: '网页设置',
+          },
+        },
       ],
     },
   ],
