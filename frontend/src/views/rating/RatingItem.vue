@@ -60,6 +60,7 @@
         <el-table-column label="操作" width="180" fixed="right" align="center">
           <template #default="{ row }">
             <el-button type="primary" :disabled="row.status !== 0" link @click="handleEdit(row)"> 编辑 </el-button>
+            <el-button type="warning" :disabled="row.status === 3" link @click="handleRating(row)"> 评分 </el-button>
             <el-button type="danger" link @click="handleDelete(row)"> 删除 </el-button>
           </template>
         </el-table-column>
@@ -91,8 +92,9 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { RatingItem, SearchForm } from '@/types'
-import { getRatingItemList } from '@/api/rating/rating.ts'
+import { deleteRatingItem, getRatingItemList } from '@/api/rating/rating.ts'
 import AddOrUpdate from '@/views/rating/AddOrUpdate.vue'
+import { useRouter } from 'vue-router'
 
 interface Pagination {
   page: number
@@ -123,6 +125,8 @@ const statusMap: Record<number, StatusInfo> = {
 const dialogVisible = ref(false)
 
 const loading = ref(false)
+
+const router = useRouter()
 
 const searchForm = reactive<SearchForm>({
   name: '',
@@ -182,8 +186,6 @@ async function loadData() {
   loading.value = true
 
   try {
-    // 后续这里替换成真实 API
-    //
     const response = await getRatingItemList({
       name: searchForm.name || undefined,
       status: searchForm.status || undefined,
@@ -229,6 +231,18 @@ function handleEdit(row: RatingItem) {
 }
 
 /**
+ * 跳转评分页面
+ */
+function handleRating(row: RatingItem) {
+  router.push({
+    name: 'rating',
+    params: {
+      id: row.id,
+    },
+  })
+}
+
+/**
  * 新增 / 修改成功后的统一处理。
  */
 function handleAddOrUpdateSuccess(mode: 'add' | 'edit') {
@@ -258,11 +272,9 @@ async function handleDelete(row: RatingItem) {
       type: 'warning',
     })
 
-    // 后续替换成真实删除 API
-    tableData.value = tableData.value.filter((item) => item.id !== row.id)
-
-    pagination.total = tableData.value.length
-
+    await deleteRatingItem(row.id)
+    pagination.page = 1
+    await loadData()
     ElMessage.success('删除成功')
   } catch {
     // 用户取消，不需要处理

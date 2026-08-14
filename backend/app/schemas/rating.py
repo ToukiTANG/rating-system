@@ -128,6 +128,18 @@ class UpdateRatingItemRequest(BaseModel):
         return value.strip()
 
 
+class DeleteRatingItemRequest(BaseModel):
+    """
+    删除评分项目请求。
+    """
+
+    # 待删除的评分项目 ID。
+    id: int = Field(
+        ge=1,
+        description="评分项目 ID",
+    )
+
+
 T = TypeVar("T")
 
 

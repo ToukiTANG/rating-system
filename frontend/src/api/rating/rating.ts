@@ -26,5 +26,5 @@ export function updateRatingItem(data: UpdateRatingItemRequest) {
  * 删除评分项目
  */
 export function deleteRatingItem(id: number) {
-  return post<void>(`/rating/deleteItems`, id)
+  return post<void>(`/rating/deleteItem`, { id: id })
 }

@@ -10,6 +10,7 @@ from app.schemas.rating import (
     RatingItemResponse,
     RatingStatus,
     UpdateRatingItemRequest,
+    DeleteRatingItemRequest
 )
 from app.services.rating_service import RatingService
 
@@ -132,4 +133,28 @@ def update_rating_item(
     return ApiResponse(
         message="修改成功",
         data=item,
+    )
+
+
+@router.post(
+    "/deleteItem",
+    response_model=ApiResponse[bool],
+)
+def delete_rating_item(
+        request: DeleteRatingItemRequest,
+        db: SessionDep,
+) -> ApiResponse[bool]:
+    """
+    删除评分项目。
+    """
+
+    service = RatingService(db)
+
+    service.delete_item(
+        request=request,
+    )
+
+    return ApiResponse(
+        message="删除成功",
+        data=True,
     )

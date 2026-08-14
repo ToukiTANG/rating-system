@@ -35,6 +35,14 @@ const router = createRouter({
         },
       ],
     },
+    {
+      path: '/rating/:id',
+      name: 'rating',
+      component: () => import('@/views/rating/RatingView.vue'),
+      meta: {
+        title: '评分',
+      },
+    },
   ],
 })
 

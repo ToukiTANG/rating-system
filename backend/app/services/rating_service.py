@@ -10,6 +10,7 @@ from app.schemas.rating import (
     RatingItemResponse,
     RatingStatus,
     UpdateRatingItemRequest,
+    DeleteRatingItemRequest
 )
 
 
@@ -273,3 +274,50 @@ class RatingService:
         return RatingItemResponse.model_validate(
             item
         )
+
+    def delete_item(
+            self,
+            request: DeleteRatingItemRequest,
+    ) -> None:
+        """
+        删除评分项目。
+        """
+
+        # -------------------------
+        # 查询待删除的数据
+        # -------------------------
+
+        item = self.db.get(
+            RatingItemModel,
+            request.id,
+        )
+
+        if item is None:
+            raise BusinessException(
+                code=10002,
+                message="评分项目不存在",
+                status_code=404,
+            )
+
+        # -------------------------
+        # 删除评分项目
+        # -------------------------
+
+        self.db.delete(item)
+
+        try:
+            # 提交删除事务。
+            self.db.commit()
+
+        except IntegrityError:
+            # 数据库操作失败后必须回滚，
+            # 否则当前 Session 会保持失败状态。
+            self.db.rollback()
+
+            # 后续如果评分项目已经被评分任务等数据引用，
+            # 外键约束可能导致删除失败。
+            raise BusinessException(
+                code=10003,
+                message="评分项目已被其他数据引用，无法删除",
+                status_code=409,
+            )
