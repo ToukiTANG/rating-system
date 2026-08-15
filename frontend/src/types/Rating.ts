@@ -10,6 +10,8 @@ export interface RatingItem {
   name: string
   description: string
   status: RatingStatus
+  distinguishExpert: boolean
+  expertWeight: number | null
   createTime: string
   updateTime: string
 }
@@ -28,6 +30,8 @@ export interface UpdateRatingItemRequest {
   id: number
   name: string
   description: string
+  distinguishExpert: boolean
+  expertWeight: number | null
 }
 
 export interface PageResult<T> {

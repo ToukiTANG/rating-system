@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Integer, SmallInteger, String
+from sqlalchemy import CheckConstraint, DateTime, Integer, SmallInteger, String, Boolean, Float
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
@@ -60,6 +60,19 @@ class RatingItemModel(Base):
         nullable=False,
         default=0,
         index=True,
+    )
+
+    # 是否区分专家评委。
+    distinguish_expert: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    # 专家评委占比。
+    expert_weight: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
     )
 
     # 创建时间。

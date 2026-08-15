@@ -8,28 +8,24 @@
     :show-close="!submitting"
     @closed="handleClosed"
   >
-    <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
+    <el-form ref="formRef" :model="formData" :rules="formRules" label-width="120px">
       <!-- 项目名称 -->
       <el-form-item label="项目名称" prop="name">
-        <el-input
-          v-model="formData.name"
-          placeholder="请输入项目名称"
-          maxlength="50"
-          show-word-limit
-          clearable
-        />
+        <el-input v-model="formData.name" placeholder="请输入项目名称" maxlength="50" show-word-limit clearable />
       </el-form-item>
 
       <!-- 项目描述 -->
       <el-form-item label="项目描述" prop="description">
-        <el-input
-          v-model="formData.description"
-          type="textarea"
-          placeholder="请输入项目描述"
-          :rows="4"
-          maxlength="500"
-          show-word-limit
-        />
+        <el-input v-model="formData.description" type="textarea" placeholder="请输入项目描述" :rows="4" maxlength="500" show-word-limit />
+      </el-form-item>
+
+      <!-- 项目描述 -->
+      <el-form-item label="区分专家评委" prop="distinguishExpert">
+        <el-switch v-model="formData.distinguishExpert" active-text="是" inactive-text="否" />
+      </el-form-item>
+      <el-form-item v-if="formData.distinguishExpert" label="专家评分占比" prop="expertWeight" required>
+        <el-input-number v-model="formData.expertWeight" :min="1" :max="99" :step="5" :precision="0" />
+        <span class="unit"> % </span>
       </el-form-item>
     </el-form>
 
@@ -47,12 +43,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import {computed, nextTick, reactive, ref, watch} from 'vue'
 
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import {ElMessage, type FormInstance, type FormRules} from 'element-plus'
 
-import { createRatingItem, updateRatingItem } from '@/api/rating/rating'
-import type { RatingItem } from '@/types'
+import {createRatingItem, updateRatingItem} from '@/api/rating/rating'
+import type {RatingItem} from '@/types'
 
 /**
  * 弹窗显示状态。
@@ -101,6 +97,8 @@ const emit = defineEmits<{
 interface RatingItemForm {
   name: string
   description: string
+  distinguishExpert: boolean
+  expertWeight: number | null
 }
 
 const formRef = ref<FormInstance>()
@@ -110,6 +108,8 @@ const submitting = ref(false)
 const formData = reactive<RatingItemForm>({
   name: '',
   description: '',
+  distinguishExpert: false,
+  expertWeight: 60,
 })
 
 /**
@@ -146,9 +146,66 @@ const formRules: FormRules<RatingItemForm> = {
 
   description: [
     {
+      required: true,
       max: 500,
       message: '项目描述长度不能超过 500 个字符',
       trigger: 'blur',
+    },
+  ],
+
+  distinguishExpert: [
+    {
+      required: true,
+      trigger: 'change',
+      message: '请选择是否需要区分专家评委',
+    },
+  ],
+  expertWeight: [
+    {
+      validator: (_rule, value, callback) => {
+        /**
+         * 不区分专家评委时，
+         * 不需要校验专家评分占比。
+         */
+        if (!formData.distinguishExpert) {
+          callback()
+          return
+        }
+
+        /**
+         * 区分专家评委时，
+         * 专家评分占比必须填写。
+         */
+        if (
+          value === null ||
+          value === undefined ||
+          value === ''
+        ) {
+          callback(
+            new Error('请输入专家评分占比'),
+          )
+          return
+        }
+
+        /**
+         * 专家评分占比必须在 0% ～ 100% 之间，
+         * 且不能取边界值。
+         */
+        if (
+          Number(value) <= 0 ||
+          Number(value) >= 100
+        ) {
+          callback(
+            new Error(
+              '专家评分占比必须大于 0% 且小于 100%',
+            ),
+          )
+          return
+        }
+
+        callback()
+      },
+      trigger: ['blur', 'change'],
     },
   ],
 }
@@ -250,17 +307,20 @@ async function handleSubmit() {
   submitting.value = true
 
   try {
-    // 提交前统一去除字符串首尾空格
-    const requestData = {
-      name: formData.name.trim(),
-      description: formData.description.trim(),
-    }
+
 
     if (isEdit.value) {
       /**
        * 修改模式
        */
       const id = props.item?.id
+      // 提交前统一去除字符串首尾空格
+      const requestData = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        distinguishExpert: formData.distinguishExpert,
+        expertWeight: formData.expertWeight !== null ? formData.expertWeight * 100 : 50
+      }
 
       if (id == null) {
         return
@@ -278,6 +338,13 @@ async function handleSubmit() {
       /**
        * 新增模式
        */
+        // 提交前统一去除字符串首尾空格
+      const requestData = {
+          name: formData.name.trim(),
+          description: formData.description.trim(),
+          distinguishExpert: formData.distinguishExpert,
+          expertWeight: formData.distinguishExpert && formData.expertWeight !== null ? formData.expertWeight / 100 : null,
+        }
       await createRatingItem(requestData)
 
       ElMessage.success('新增成功')

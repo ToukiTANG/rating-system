@@ -1,12 +1,12 @@
 from datetime import datetime
 from enum import IntEnum
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Self
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    field_validator,
+    field_validator, model_validator,
 )
 
 
@@ -33,6 +33,19 @@ class CreateRatingItemRequest(BaseModel):
         description="项目描述",
     )
 
+    distinguish_expert: bool = Field(
+        default=False,
+        alias="distinguishExpert",
+        description="是否区分专家评委",
+    )
+
+    expert_weight: float | None = Field(
+        default=None,
+        alias="expertWeight",
+        gt=0,
+        lt=1,
+    )
+
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str) -> str:
@@ -52,6 +65,23 @@ class CreateRatingItemRequest(BaseModel):
 
         return value.strip()
 
+    @model_validator(mode="after")
+    def validate_expert_weight(self) -> Self:
+        """
+        校验专家评分配置。
+        """
+
+        if self.distinguish_expert:
+            if self.expert_weight is None:
+                raise ValueError(
+                    "区分专家评委时必须设置专家评分占比"
+                )
+        else:
+            # 不区分专家时清空专家权重。
+            self.expert_weight = None
+
+        return self
+
 
 class RatingItemResponse(BaseModel):
     """评分项目响应。"""
@@ -65,6 +95,13 @@ class RatingItemResponse(BaseModel):
     name: str
     description: str
     status: RatingStatus
+    distinguish_expert: bool = Field(
+        alias="distinguishExpert",
+    )
+
+    expert_weight: float | None = Field(
+        alias="expertWeight",
+    )
 
     create_time: datetime = Field(
         alias="createTime",
@@ -100,6 +137,18 @@ class UpdateRatingItemRequest(BaseModel):
         description="项目描述",
     )
 
+    distinguish_expert: bool = Field(
+        alias="distinguishExpert",
+        description="是否区分专家评委",
+    )
+
+    expert_weight: float | None = Field(
+        default=None,
+        alias="expertWeight",
+        gt=0,
+        lt=1,
+    )
+
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str) -> str:
@@ -126,6 +175,18 @@ class UpdateRatingItemRequest(BaseModel):
         """
 
         return value.strip()
+
+    @model_validator(mode="after")
+    def validate_expert_weight(self) -> Self:
+        if self.distinguish_expert:
+            if self.expert_weight is None:
+                raise ValueError(
+                    "区分专家评委时必须设置专家评分占比"
+                )
+        else:
+            self.expert_weight = None
+
+        return self
 
 
 class DeleteRatingItemRequest(BaseModel):
@@ -171,6 +232,7 @@ class PageResult(BaseModel, Generic[T]):
         alias="pageSize",
     )
 
+
 class RatingActionRequest(BaseModel):
     """
     评分项目操作请求。
@@ -180,6 +242,7 @@ class RatingActionRequest(BaseModel):
         ge=1,
         description="评分项目 ID",
     )
+
 
 class SubmitScoreRequest(BaseModel):
     """
@@ -209,6 +272,7 @@ class SubmitScoreRequest(BaseModel):
         populate_by_name=True,
     )
 
+
 class RatingStatusResponse(BaseModel):
     """
     当前客户端评分状态。
@@ -232,6 +296,7 @@ class RatingStatusResponse(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
+
 
 class RatingStatisticsResponse(BaseModel):
     """
@@ -259,6 +324,7 @@ class RatingStatisticsResponse(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
+
 
 class RatingResultResponse(BaseModel):
     """

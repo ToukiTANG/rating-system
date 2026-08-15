@@ -48,6 +48,23 @@
         <el-table-column prop="name" label="项目名称" min-width="150" show-overflow-tooltip />
 
         <el-table-column prop="description" label="项目描述" min-width="260" show-overflow-tooltip />
+        <el-table-column label="区分专家评委" width="130" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.distinguishExpert ? 'success' : 'info'">
+              {{ row.distinguishExpert ? '是' : '否' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="专家评委占比" width="140" align="center">
+          <template #default="{ row }">
+            <span v-if="row.distinguishExpert && row.expertWeight !== null">
+              {{ formatExpertWeight(row.expertWeight) }}
+            </span>
+
+            <span v-else class="empty-value"> -- </span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
@@ -57,7 +74,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" width="180" fixed="right" align="center" class-name="operation-column">
           <template #default="{ row }">
             <el-button type="primary" :disabled="row.status !== 0" link @click="handleEdit(row)"> 编辑 </el-button>
             <el-button type="warning" :disabled="row.status === 3" link @click="handleRating(row)"> 评分 </el-button>
@@ -177,6 +194,19 @@ function handleReset() {
   pagination.page = 1
 
   loadData()
+}
+
+/**
+ * 格式化专家评委占比。
+ *
+ * 后端存储：
+ * 0.6
+ *
+ * 页面展示：
+ * 60%
+ */
+function formatExpertWeight(expertWeight: number): string {
+  return `${Math.round(expertWeight * 100)}%`
 }
 
 /**
@@ -382,6 +412,14 @@ onMounted(() => {
   font-weight: 600;
 
   color: #303133;
+}
+
+:deep(.operation-column) {
+  border-left: 1px solid var(--el-table-border-color) !important;
+}
+
+.empty-value {
+  color: #909399;
 }
 
 /* =========================

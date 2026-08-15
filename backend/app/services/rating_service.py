@@ -160,7 +160,8 @@ class RatingService:
         item = RatingItemModel(
             name=request.name,
             description=request.description,
-
+            distinguish_expert=request.distinguish_expert,
+            expert_weight=request.expert_weight,
             # 新增项目固定为初始化状态。
             status=int(
                 RatingStatus.INITIALIZED
@@ -255,7 +256,8 @@ class RatingService:
 
         item.name = request.name
         item.description = request.description
-
+        item.distinguish_expert = request.distinguish_expert
+        item.expert_weight = request.expert_weight
         # status 属于系统状态，
         # 普通修改接口不允许直接修改。
         try:
