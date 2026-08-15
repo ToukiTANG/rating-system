@@ -43,6 +43,12 @@ const router = createRouter({
         title: '评分',
       },
     },
+    {
+      path: '/score/:id',
+      name: 'SubmitRating',
+      component: () =>
+        import('@/views/rating/SubmitRating.vue'),
+    }
   ],
 })
 

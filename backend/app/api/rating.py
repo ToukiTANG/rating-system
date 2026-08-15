@@ -1,4 +1,3 @@
-import numbers
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
@@ -13,7 +12,10 @@ from app.schemas.rating import (
     UpdateRatingItemRequest,
     DeleteRatingItemRequest,
     RatingActionRequest,
-    RatingStatisticsResponse
+    RatingStatisticsResponse,
+    RatingResultResponse,
+    SubmitScoreRequest,
+    RatingStatusResponse
 )
 from app.services.rating_service import RatingService
 
@@ -253,27 +255,84 @@ def finish_rating(
     ],
 )
 def get_statistics(
-        id: Annotated[
-            int,
-            Query(
-                ge=1,
-                description="评分项目 ID",
-            ),
-        ],
         db: SessionDep,
+        id: int = Query(
+            ge=1,
+            description="评分项目 ID",
+        ),
 ) -> ApiResponse[
     RatingStatisticsResponse
 ]:
     """
-    获取评分项目实时统计数据。
+    获取评分项目实时统计结果。
     """
 
     service = RatingService(db)
 
-    statistics = service.get_statistics(
+    result = service.get_statistics(
         item_id=id,
     )
 
     return ApiResponse(
-        data=statistics,
+        data=result,
+    )
+
+
+@router.post(
+    "/submitScore",
+    response_model=ApiResponse[
+        RatingResultResponse
+    ],
+)
+def submit_score(
+        request: SubmitScoreRequest,
+        db: SessionDep,
+) -> ApiResponse[RatingResultResponse]:
+    """
+    提交评分。
+    """
+
+    service = RatingService(db)
+
+    result = service.submit_score(
+        request=request,
+    )
+
+    return ApiResponse(
+        message="评分提交成功",
+        data=result,
+    )
+
+
+@router.get(
+    "/getRatingStatus",
+    response_model=ApiResponse[
+        RatingStatusResponse
+    ],
+)
+def get_rating_status(
+        db: SessionDep,
+        ratingItemId: int = Query(
+            ge=1,
+            description="评分项目 ID",
+        ),
+        clientId: str = Query(
+            min_length=1,
+            max_length=64,
+            description="浏览器客户端 ID",
+        ),
+) -> ApiResponse[RatingStatusResponse]:
+    """
+    查询当前浏览器客户端的评分状态。
+    """
+
+    service = RatingService(db)
+
+    result = service.get_rating_status(
+        item_id=ratingItemId,
+        client_id=clientId,
+    )
+
+    return ApiResponse(
+        data=result,
     )

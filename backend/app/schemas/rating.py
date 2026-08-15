@@ -151,35 +151,6 @@ class GetRatingItemRequest(BaseModel):
     )
 
 
-class RatingActionRequest(BaseModel):
-    """
-    评分操作请求。
-
-    用于开始评分、结束评分等需要指定评分项目 ID 的操作。
-    """
-
-    id: int = Field(
-        ge=1,
-        description="评分项目 ID",
-    )
-
-
-class RatingStatisticsResponse(BaseModel):
-    """
-    评分统计响应。
-    """
-
-    # 当前平均分。
-    #
-    # 当还没有任何评分结果时返回 None。
-    averageScore: float | None = None
-
-    # 当前统计数据最后更新时间。
-    #
-    # 暂无统计数据时返回 None。
-    updateTime: str | None = None
-
-
 T = TypeVar("T")
 
 
@@ -198,4 +169,115 @@ class PageResult(BaseModel, Generic[T]):
 
     page_size: int = Field(
         alias="pageSize",
+    )
+
+class RatingActionRequest(BaseModel):
+    """
+    评分项目操作请求。
+    """
+
+    id: int = Field(
+        ge=1,
+        description="评分项目 ID",
+    )
+
+class SubmitScoreRequest(BaseModel):
+    """
+    提交评分请求。
+    """
+
+    rating_item_id: int = Field(
+        alias="ratingItemId",
+        ge=1,
+        description="评分项目 ID",
+    )
+
+    client_id: str = Field(
+        alias="clientId",
+        min_length=1,
+        max_length=64,
+        description="浏览器客户端唯一标识",
+    )
+
+    score: float = Field(
+        ge=0,
+        le=5,
+        description="评分",
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+class RatingStatusResponse(BaseModel):
+    """
+    当前客户端评分状态。
+    """
+
+    submitted: bool = Field(
+        description="是否已经提交评分",
+    )
+
+    score: float | None = Field(
+        default=None,
+        description="已提交的评分",
+    )
+
+    submit_time: datetime | None = Field(
+        default=None,
+        alias="submitTime",
+        description="提交时间",
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+class RatingStatisticsResponse(BaseModel):
+    """
+    评分项目统计结果。
+    """
+
+    average_score: float | None = Field(
+        default=None,
+        alias="averageScore",
+        description="当前平均分",
+    )
+
+    rating_count: int = Field(
+        default=0,
+        alias="ratingCount",
+        description="已提交评分数量",
+    )
+
+    update_time: datetime | None = Field(
+        default=None,
+        alias="updateTime",
+        description="最后一条评分提交时间",
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+class RatingResultResponse(BaseModel):
+    """
+    评分结果响应。
+    """
+
+    id: int
+
+    rating_item_id: int = Field(
+        alias="ratingItemId",
+    )
+
+    score: float
+
+    create_time: datetime = Field(
+        alias="createTime",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
     )

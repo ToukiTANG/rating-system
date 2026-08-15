@@ -1,5 +1,11 @@
-import { get, post } from '../request'
-import type { RatingItemQuery, PageResult, RatingItem, UpdateRatingItemRequest ,RatingStatistics} from '@/types'
+import {get, post} from '../request'
+import type {
+  PageResult,
+  RatingItem,
+  RatingItemQuery,
+  RatingStatistics,
+  UpdateRatingItemRequest
+} from '@/types'
 
 /**
  * 获取评分项目列表
@@ -76,5 +82,48 @@ export function getRatingStatistics(params: {
   return get<RatingStatistics>(
     '/rating/getStatistics',
     params,
+  )
+}
+
+export interface RatingClientStatus {
+  submitted: boolean
+  score: number | null
+  submitTime: string | null
+}
+
+export interface GetRatingStatusParams {
+  ratingItemId: number
+  clientId: string
+}
+
+export interface SubmitScoreRequest {
+  ratingItemId: number
+  clientId: string
+  score: number
+}
+
+
+/**
+ * 查询当前浏览器客户端是否已经评分。
+ */
+export function getRatingStatus(
+  params: GetRatingStatusParams,
+) {
+  return get<RatingClientStatus>(
+    '/rating/getRatingStatus',
+    params,
+  )
+}
+
+
+/**
+ * 提交评分。
+ */
+export function submitScore(
+  data: SubmitScoreRequest,
+) {
+  return post(
+    '/rating/submitScore',
+    data,
   )
 }

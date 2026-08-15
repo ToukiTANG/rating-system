@@ -6,7 +6,9 @@ Alembic 在执行 autogenerate 时，需要所有 ORM Model
 """
 
 from app.models.rating_item import RatingItemModel
+from app.models.rating_result import RatingResultModel
 
 __all__ = [
     "RatingItemModel",
+    "RatingResultModel",
 ]

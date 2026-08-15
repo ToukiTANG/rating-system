@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
+from app.models import RatingResultModel
 from app.models.rating_item import RatingItemModel
 from app.schemas.rating import (
     CreateRatingItemRequest,
@@ -11,7 +12,10 @@ from app.schemas.rating import (
     RatingStatus,
     UpdateRatingItemRequest,
     DeleteRatingItemRequest,
-    RatingStatisticsResponse
+    RatingStatisticsResponse,
+    SubmitScoreRequest,
+    RatingResultResponse,
+    RatingStatusResponse
 )
 
 
@@ -446,15 +450,82 @@ class RatingService:
             item
         )
 
-    def get_statistics(
+    def submit_score(
+            self,
+            request: SubmitScoreRequest,
+    ) -> RatingResultResponse:
+        """
+        提交评分。
+
+        同一个浏览器客户端，对同一个评分项目
+        只能成功提交一次评分。
+        """
+
+        # 查询评分项目。
+        item = self.db.get(
+            RatingItemModel,
+            request.rating_item_id,
+        )
+
+        if item is None:
+            raise BusinessException(
+                code=10002,
+                message="评分项目不存在",
+                status_code=404,
+            )
+
+        # 只有评分中状态允许提交评分。
+        if item.status != int(
+                RatingStatus.RATING
+        ):
+            raise BusinessException(
+                code=10006,
+                message="当前项目不允许评分",
+                status_code=409,
+            )
+
+        result = RatingResultModel(
+            rating_item_id=request.rating_item_id,
+            client_id=request.client_id,
+            score=request.score,
+        )
+
+        self.db.add(result)
+
+        try:
+            self.db.commit()
+
+        except IntegrityError:
+            self.db.rollback()
+
+            # 数据库唯一约束作为最终兜底：
+            #
+            # UNIQUE(
+            #     rating_item_id,
+            #     client_id
+            # )
+            #
+            # 即使发生并发重复请求，
+            # 也只允许其中一个请求成功。
+            raise BusinessException(
+                code=10007,
+                message="您已经提交过评分",
+                status_code=409,
+            )
+
+        self.db.refresh(result)
+
+        return RatingResultResponse.model_validate(
+            result
+        )
+
+    def get_rating_status(
             self,
             item_id: int,
-    ) -> RatingStatisticsResponse:
+            client_id: str,
+    ) -> RatingStatusResponse:
         """
-        获取评分项目实时统计信息。
-
-        当前阶段暂未接入评分结果表，
-        因此先返回空统计数据。
+        查询当前客户端是否已经提交评分。
         """
 
         item = self.db.get(
@@ -469,7 +540,80 @@ class RatingService:
                 status_code=404,
             )
 
+        stmt = (
+            select(RatingResultModel)
+            .where(
+                RatingResultModel.rating_item_id
+                == item_id,
+                RatingResultModel.client_id
+                == client_id,
+            )
+        )
+
+        result = self.db.scalar(stmt)
+
+        if result is None:
+            return RatingStatusResponse(
+                submitted=False,
+            )
+
+        return RatingStatusResponse(
+            submitted=True,
+            score=result.score,
+            submitTime=result.create_time,
+        )
+
+    def get_statistics(
+            self,
+            item_id: int,
+    ) -> RatingStatisticsResponse:
+        """
+        获取评分项目实时统计结果。
+        """
+
+        item = self.db.get(
+            RatingItemModel,
+            item_id,
+        )
+
+        if item is None:
+            raise BusinessException(
+                code=10002,
+                message="评分项目不存在",
+                status_code=404,
+            )
+
+        stmt = (
+            select(
+                func.avg(
+                    RatingResultModel.score
+                ),
+                func.count(
+                    RatingResultModel.id
+                ),
+                func.max(
+                    RatingResultModel.create_time
+                ),
+            )
+            .where(
+                RatingResultModel.rating_item_id
+                == item_id
+            )
+        )
+
+        average_score, rating_count, update_time = (
+            self.db.execute(stmt).one()
+        )
+
         return RatingStatisticsResponse(
-            averageScore=None,
-            updateTime=None,
+            averageScore=(
+                round(
+                    float(average_score),
+                    2,
+                )
+                if average_score is not None
+                else None
+            ),
+            ratingCount=rating_count,
+            updateTime=update_time,
         )
