@@ -10,7 +10,8 @@ from app.schemas.rating import (
     RatingItemResponse,
     RatingStatus,
     UpdateRatingItemRequest,
-    DeleteRatingItemRequest
+    DeleteRatingItemRequest,
+    RatingStatisticsResponse
 )
 
 
@@ -321,3 +322,154 @@ class RatingService:
                 message="评分项目已被其他数据引用，无法删除",
                 status_code=409,
             )
+
+    def get_item(
+            self,
+            item_id: int,
+    ) -> RatingItemResponse:
+        """
+        根据 ID 查询单个评分项目。
+        """
+
+        item = self.db.get(
+            RatingItemModel,
+            item_id,
+        )
+
+        if item is None:
+            raise BusinessException(
+                code=10002,
+                message="评分项目不存在",
+                status_code=404,
+            )
+
+        return RatingItemResponse.model_validate(
+            item
+        )
+
+    def start_rating(
+            self,
+            item_id: int,
+    ) -> RatingItemResponse:
+        """
+        开始评分。
+
+        状态只能从：
+            0（初始化）
+        修改为：
+            1（评分中）
+        """
+
+        item = self.db.get(
+            RatingItemModel,
+            item_id,
+        )
+
+        if item is None:
+            raise BusinessException(
+                code=10002,
+                message="评分项目不存在",
+                status_code=404,
+            )
+
+        # 只有初始化状态允许开始评分。
+        if item.status != int(
+                RatingStatus.INITIALIZED
+        ):
+            raise BusinessException(
+                code=10004,
+                message="当前状态不允许开始评分",
+                status_code=409,
+            )
+
+        # 更新评分状态。
+        item.status = int(
+            RatingStatus.RATING
+        )
+
+        self.db.commit()
+
+        # 获取数据库最新值，
+        # 包括 update_time。
+        self.db.refresh(item)
+
+        return RatingItemResponse.model_validate(
+            item
+        )
+
+    def finish_rating(
+            self,
+            item_id: int,
+    ) -> RatingItemResponse:
+        """
+        结束评分。
+
+        状态只能从：
+            1（评分中）
+        修改为：
+            2（已评分）
+        """
+
+        item = self.db.get(
+            RatingItemModel,
+            item_id,
+        )
+
+        if item is None:
+            raise BusinessException(
+                code=10002,
+                message="评分项目不存在",
+                status_code=404,
+            )
+
+        # 只有评分中状态允许结束评分。
+        if item.status != int(
+                RatingStatus.RATING
+        ):
+            raise BusinessException(
+                code=10005,
+                message="当前状态不允许结束评分",
+                status_code=409,
+            )
+
+        # 更新评分状态。
+        item.status = int(
+            RatingStatus.RATED
+        )
+
+        self.db.commit()
+
+        # 刷新数据库最新数据。
+        self.db.refresh(item)
+
+        return RatingItemResponse.model_validate(
+            item
+        )
+
+    def get_statistics(
+            self,
+            item_id: int,
+    ) -> RatingStatisticsResponse:
+        """
+        获取评分项目实时统计信息。
+
+        当前阶段暂未接入评分结果表，
+        因此先返回空统计数据。
+        """
+
+        item = self.db.get(
+            RatingItemModel,
+            item_id,
+        )
+
+        if item is None:
+            raise BusinessException(
+                code=10002,
+                message="评分项目不存在",
+                status_code=404,
+            )
+
+        return RatingStatisticsResponse(
+            averageScore=None,
+            updateTime=None,
+        )

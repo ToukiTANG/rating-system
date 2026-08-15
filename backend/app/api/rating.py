@@ -1,3 +1,4 @@
+import numbers
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
@@ -10,7 +11,9 @@ from app.schemas.rating import (
     RatingItemResponse,
     RatingStatus,
     UpdateRatingItemRequest,
-    DeleteRatingItemRequest
+    DeleteRatingItemRequest,
+    RatingActionRequest,
+    RatingStatisticsResponse
 )
 from app.services.rating_service import RatingService
 
@@ -157,4 +160,120 @@ def delete_rating_item(
     return ApiResponse(
         message="删除成功",
         data=True,
+    )
+
+
+@router.get(
+    "/getItem",
+    response_model=ApiResponse[
+        RatingItemResponse
+    ],
+)
+def get_rating_item(
+        id: Annotated[
+            int,
+            Query(
+                ge=1,
+                description="评分项目 ID",
+            ),
+        ],
+        db: SessionDep,
+) -> ApiResponse[RatingItemResponse]:
+    """
+    查询单个评分项目。
+    """
+
+    service = RatingService(db)
+
+    item = service.get_item(
+        item_id=id,
+    )
+
+    return ApiResponse(
+        data=item,
+    )
+
+
+@router.post(
+    "/startRating",
+    response_model=ApiResponse[
+        RatingItemResponse
+    ],
+)
+def start_rating(
+        request: RatingActionRequest,
+        db: SessionDep,
+) -> ApiResponse[RatingItemResponse]:
+    """
+    开始评分。
+    """
+
+    service = RatingService(db)
+
+    item = service.start_rating(
+        item_id=request.id,
+    )
+
+    return ApiResponse(
+        message="评分已开始",
+        data=item,
+    )
+
+
+@router.post(
+    "/finishRating",
+    response_model=ApiResponse[
+        RatingItemResponse
+    ],
+)
+def finish_rating(
+        request: RatingActionRequest,
+        db: SessionDep,
+) -> ApiResponse[RatingItemResponse]:
+    """
+    结束评分。
+    """
+
+    service = RatingService(db)
+
+    item = service.finish_rating(
+        item_id=request.id,
+    )
+
+    return ApiResponse(
+        message="评分已结束",
+        data=item,
+    )
+
+
+@router.get(
+    "/getStatistics",
+    response_model=ApiResponse[
+        RatingStatisticsResponse
+    ],
+)
+def get_statistics(
+        id: Annotated[
+            int,
+            Query(
+                ge=1,
+                description="评分项目 ID",
+            ),
+        ],
+        db: SessionDep,
+) -> ApiResponse[
+    RatingStatisticsResponse
+]:
+    """
+    获取评分项目实时统计数据。
+    """
+
+    service = RatingService(db)
+
+    statistics = service.get_statistics(
+        item_id=id,
+    )
+
+    return ApiResponse(
+        data=statistics,
     )

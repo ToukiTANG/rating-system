@@ -11,23 +11,23 @@ const router = createRouter({
       children: [
         {
           path: '',
-          name: 'home',
+          name: 'Home',
           component: () => import('@/views/HomeView.vue'),
           meta: {
             title: '首页',
           },
         },
         {
-          path: 'ratingItem',
-          name: 'ratingItem',
+          path: 'RatingItem',
+          name: 'RatingItem',
           component: () => import('@/views/rating/RatingItem.vue'),
           meta: {
             title: '评分项目',
           },
         },
         {
-          path: 'setting',
-          name: 'setting',
+          path: 'Setting',
+          name: 'Setting',
           component: () => import('@/views/SettingView.vue'),
           meta: {
             title: '网页设置',
@@ -36,8 +36,8 @@ const router = createRouter({
       ],
     },
     {
-      path: '/rating/:id',
-      name: 'rating',
+      path: '/Rating/:id',
+      name: 'Rating',
       component: () => import('@/views/rating/RatingView.vue'),
       meta: {
         title: '评分',

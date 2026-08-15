@@ -235,9 +235,14 @@ function handleEdit(row: RatingItem) {
  */
 function handleRating(row: RatingItem) {
   router.push({
-    name: 'rating',
+    name: 'Rating',
     params: {
       id: row.id,
+    },
+    state: {
+      item: {
+        ...row,
+      },
     },
   })
 }

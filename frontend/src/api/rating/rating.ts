@@ -1,5 +1,5 @@
 import { get, post } from '../request'
-import type { RatingItemQuery, PageResult, RatingItem, UpdateRatingItemRequest } from '@/types'
+import type { RatingItemQuery, PageResult, RatingItem, UpdateRatingItemRequest ,RatingStatistics} from '@/types'
 
 /**
  * 获取评分项目列表
@@ -27,4 +27,54 @@ export function updateRatingItem(data: UpdateRatingItemRequest) {
  */
 export function deleteRatingItem(id: number) {
   return post<void>(`/rating/deleteItem`, { id: id })
+}
+
+/**
+ * 获取单个评分项目。
+ */
+export function getRatingItem(params: {
+  id: number
+}) {
+  return get<RatingItem>(
+    '/rating/getItem',
+    params,
+  )
+}
+
+
+/**
+ * 开始评分。
+ */
+export function startRating(data: {
+  id: number
+}) {
+  return post<RatingItem>(
+    '/rating/startRating',
+    data,
+  )
+}
+
+
+/**
+ * 结束评分。
+ */
+export function finishRating(data: {
+  id: number
+}) {
+  return post<RatingItem>(
+    '/rating/finishRating',
+    data,
+  )
+}
+
+/**
+ * 获取实时评分统计。
+ */
+export function getRatingStatistics(params: {
+  id: number
+}) {
+  return get<RatingStatistics>(
+    '/rating/getStatistics',
+    params,
+  )
 }

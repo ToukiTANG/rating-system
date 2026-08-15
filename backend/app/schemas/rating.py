@@ -140,6 +140,46 @@ class DeleteRatingItemRequest(BaseModel):
     )
 
 
+class GetRatingItemRequest(BaseModel):
+    """
+    查询单个评分项目请求。
+    """
+
+    id: int = Field(
+        ge=1,
+        description="评分项目 ID",
+    )
+
+
+class RatingActionRequest(BaseModel):
+    """
+    评分操作请求。
+
+    用于开始评分、结束评分等需要指定评分项目 ID 的操作。
+    """
+
+    id: int = Field(
+        ge=1,
+        description="评分项目 ID",
+    )
+
+
+class RatingStatisticsResponse(BaseModel):
+    """
+    评分统计响应。
+    """
+
+    # 当前平均分。
+    #
+    # 当还没有任何评分结果时返回 None。
+    averageScore: float | None = None
+
+    # 当前统计数据最后更新时间。
+    #
+    # 暂无统计数据时返回 None。
+    updateTime: str | None = None
+
+
 T = TypeVar("T")
 
 

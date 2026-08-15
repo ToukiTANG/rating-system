@@ -34,3 +34,8 @@ export interface PageResult<T> {
   list: T[]
   total: number
 }
+
+export interface RatingStatistics {
+  averageScore: number | null
+  updateTime: string | null
+}

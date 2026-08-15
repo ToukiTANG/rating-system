@@ -16,7 +16,7 @@
           <span>首页</span>
         </el-menu-item>
 
-        <el-menu-item index="/ratingItem">
+        <el-menu-item index="/RatingItem">
           <el-icon><Files /></el-icon>
           <span>评分项目</span>
         </el-menu-item>
@@ -24,7 +24,7 @@
 
       <div class="sidebar-footer">
         <el-menu :default-active="activeMenu" router>
-          <el-menu-item index="/setting">
+          <el-menu-item index="/Setting">
             <el-icon><Setting /></el-icon>
             <span>设置</span>
           </el-menu-item>
