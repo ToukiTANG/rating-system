@@ -7,6 +7,9 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.28 /uv /uvx /bin/
 # 工作目录
 WORKDIR /app
 
+# 国内服务器使用 PyPI 镜像，加速 Python 依赖下载
+ENV UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
+
 # 先复制依赖文件，充分利用 Docker 缓存
 COPY pyproject.toml uv.lock ./
 
