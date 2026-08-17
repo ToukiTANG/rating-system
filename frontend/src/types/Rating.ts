@@ -12,6 +12,7 @@ export interface RatingItem {
   status: RatingStatus
   distinguishExpert: boolean
   expertWeight: number | null
+  expertToken: string | null
   createTime: string
   updateTime: string
 }

@@ -100,6 +100,7 @@ export interface SubmitScoreRequest {
   ratingItemId: number
   clientId: string
   score: number
+  expertToken: string | null
 }
 
 
@@ -119,11 +120,6 @@ export function getRatingStatus(
 /**
  * 提交评分。
  */
-export function submitScore(
-  data: SubmitScoreRequest,
-) {
-  return post(
-    '/rating/submitScore',
-    data,
-  )
+export function submitScore(data: SubmitScoreRequest) {
+  return post('/rating/submitScore', data)
 }

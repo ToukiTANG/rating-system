@@ -103,6 +103,11 @@ class RatingItemResponse(BaseModel):
         alias="expertWeight",
     )
 
+    expert_token: str | None = Field(
+        default=None,
+        alias="expertToken",
+    )
+
     create_time: datetime = Field(
         alias="createTime",
     )
@@ -260,6 +265,15 @@ class SubmitScoreRequest(BaseModel):
         min_length=1,
         max_length=64,
         description="浏览器客户端唯一标识",
+    )
+
+    # 大众评分不传。
+    #
+    # 专家评分从专家二维码 URL 中获取。
+    expert_token: str | None = Field(
+        default=None,
+        alias="expertToken",
+        max_length=64,
     )
 
     score: float = Field(

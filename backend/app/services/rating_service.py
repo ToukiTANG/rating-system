@@ -1,10 +1,14 @@
-from sqlalchemy import func, select
+from hmac import compare_digest
+from secrets import token_urlsafe
+
+from sqlalchemy import func, select, case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
 from app.models import RatingResultModel
 from app.models.rating_item import RatingItemModel
+from app.models.rating_result import ReviewerType
 from app.schemas.rating import (
     CreateRatingItemRequest,
     PageResult,
@@ -157,11 +161,18 @@ class RatingService:
         # 创建 ORM 对象
         # -------------------------
 
+        expert_token = (
+            token_urlsafe(24)
+            if request.distinguish_expert
+            else None
+        )
+
         item = RatingItemModel(
             name=request.name,
             description=request.description,
             distinguish_expert=request.distinguish_expert,
             expert_weight=request.expert_weight,
+            expert_token=expert_token,
             # 新增项目固定为初始化状态。
             status=int(
                 RatingStatus.INITIALIZED
@@ -258,6 +269,14 @@ class RatingService:
         item.description = request.description
         item.distinguish_expert = request.distinguish_expert
         item.expert_weight = request.expert_weight
+
+        if request.distinguish_expert:
+            # 原来没有开启专家评分，现在开启时才创建Token。
+            if not item.expert_token:
+                item.expert_token = token_urlsafe(24)
+        else:
+            # 关闭专家评分时是否清除Token，可以按业务选择。
+            item.expert_token = None
         # status 属于系统状态，
         # 普通修改接口不允许直接修改。
         try:
@@ -486,9 +505,38 @@ class RatingService:
                 status_code=409,
             )
 
+        # 默认是大众评分。
+        reviewer_type = ReviewerType.PUBLIC
+
+        # URL 携带 expertToken，
+        # 说明用户试图通过专家入口评分。
+        if request.expert_token is not None:
+            if not item.distinguish_expert:
+                raise BusinessException(
+                    code=10008,
+                    message="当前项目未开启专家评分",
+                    status_code=403,
+                )
+
+            if (
+                    item.expert_token is None
+                    or not compare_digest(
+                request.expert_token,
+                item.expert_token,
+            )
+            ):
+                raise BusinessException(
+                    code=10009,
+                    message="专家评分凭证无效",
+                    status_code=403,
+                )
+
+            reviewer_type = ReviewerType.EXPERT
+
         result = RatingResultModel(
             rating_item_id=request.rating_item_id,
             client_id=request.client_id,
+            reviewer_type=int(reviewer_type),
             score=request.score,
         )
 
@@ -500,15 +548,6 @@ class RatingService:
         except IntegrityError:
             self.db.rollback()
 
-            # 数据库唯一约束作为最终兜底：
-            #
-            # UNIQUE(
-            #     rating_item_id,
-            #     client_id
-            # )
-            #
-            # 即使发生并发重复请求，
-            # 也只允许其中一个请求成功。
             raise BusinessException(
                 code=10007,
                 message="您已经提交过评分",
@@ -585,14 +624,93 @@ class RatingService:
                 status_code=404,
             )
 
+        # 不区分专家评委时，
+        # 直接计算所有评分的平均分。
+        if not item.distinguish_expert:
+            stmt = (
+                select(
+                    func.avg(
+                        RatingResultModel.score
+                    ),
+                    func.count(
+                        RatingResultModel.id
+                    ),
+                    func.max(
+                        RatingResultModel.create_time
+                    ),
+                )
+                .where(
+                    RatingResultModel.rating_item_id
+                    == item_id
+                )
+            )
+
+            average_score, rating_count, update_time = (
+                self.db.execute(stmt).one()
+            )
+
+            return RatingStatisticsResponse(
+                averageScore=(
+                    round(
+                        float(average_score),
+                        2,
+                    )
+                    if average_score is not None
+                    else None
+                ),
+                ratingCount=rating_count,
+                updateTime=update_time,
+            )
+
+        # 开启专家评分时，
+        # expert_weight 必须存在。
+        if item.expert_weight is None:
+            raise BusinessException(
+                code=10010,
+                message="评分项目专家权重配置异常",
+                status_code=500,
+            )
+
         stmt = (
             select(
-                func.avg(
-                    RatingResultModel.score
+                # 专家平均分。
+                # 当前没有专家评分时按 0 处理。
+                func.coalesce(
+                    func.avg(
+                        case(
+                            (
+                                RatingResultModel.reviewer_type
+                                == int(ReviewerType.EXPERT),
+                                RatingResultModel.score,
+                            ),
+                            else_=None,
+                        )
+                    ),
+                    0.0,
                 ),
+
+                # 大众平均分。
+                # 当前没有大众评分时按 0 处理。
+                func.coalesce(
+                    func.avg(
+                        case(
+                            (
+                                RatingResultModel.reviewer_type
+                                == int(ReviewerType.PUBLIC),
+                                RatingResultModel.score,
+                            ),
+                            else_=None,
+                        )
+                    ),
+                    0.0,
+                ),
+
+                # 总评分人数。
                 func.count(
                     RatingResultModel.id
                 ),
+
+                # 最后一次评分时间。
                 func.max(
                     RatingResultModel.create_time
                 ),
@@ -603,18 +721,33 @@ class RatingService:
             )
         )
 
-        average_score, rating_count, update_time = (
-            self.db.execute(stmt).one()
+        (
+            expert_average,
+            public_average,
+            rating_count,
+            update_time,
+        ) = self.db.execute(stmt).one()
+
+        expert_weight = float(
+            item.expert_weight
+        )
+
+        public_weight = (
+                1 - expert_weight
+        )
+
+        # 根据专家和大众权重计算实时最终分。
+        average_score = (
+                float(expert_average)
+                * expert_weight
+                + float(public_average)
+                * public_weight
         )
 
         return RatingStatisticsResponse(
-            averageScore=(
-                round(
-                    float(average_score),
-                    2,
-                )
-                if average_score is not None
-                else None
+            averageScore=round(
+                average_score,
+                2,
             ),
             ratingCount=rating_count,
             updateTime=update_time,

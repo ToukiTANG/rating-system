@@ -74,9 +74,10 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="180" fixed="right" align="center" class-name="operation-column">
+        <el-table-column label="操作" width="250" fixed="right" align="center" class-name="operation-column">
           <template #default="{ row }">
             <el-button type="primary" :disabled="row.status !== 0" link @click="handleEdit(row)"> 编辑 </el-button>
+            <el-button type="primary" :disabled="row.status !== 0" link @click="GenerateQR(row)"> 生成二维码 </el-button>
             <el-button type="warning" :disabled="row.status === 3" link @click="handleRating(row)"> 评分 </el-button>
             <el-button type="danger" link @click="handleDelete(row)"> 删除 </el-button>
           </template>
@@ -101,6 +102,7 @@
       </div>
     </section>
     <AddOrUpdate v-model="dialogVisible" :item="currentItem" @success="handleAddOrUpdateSuccess" />
+    <QrCodeDialog v-model="qrCodeDialogVisible" :item="qrCodeItem" />
   </div>
 </template>
 
@@ -112,6 +114,7 @@ import type { RatingItem, SearchForm } from '@/types'
 import { deleteRatingItem, getRatingItemList } from '@/api/rating/rating.ts'
 import AddOrUpdate from '@/views/rating/AddOrUpdate.vue'
 import { useRouter } from 'vue-router'
+import QrCodeDialog from '@/views/rating/QrCodeDialog.vue'
 
 interface Pagination {
   page: number
@@ -157,6 +160,13 @@ const pagination = reactive<Pagination>({
 })
 
 const tableData = ref<RatingItem[]>([])
+
+const qrCodeDialogVisible = ref(false)
+
+/**
+ * 当前准备生成二维码的评分项目。
+ */
+const qrCodeItem = ref<RatingItem | null>(null)
 
 /**
  * 当前正在编辑的评分项目。
@@ -261,6 +271,15 @@ function handleEdit(row: RatingItem) {
 }
 
 /**
+ * 生成二维码
+ */
+function GenerateQR(row: RatingItem) {
+  qrCodeItem.value = row
+
+  qrCodeDialogVisible.value = true
+}
+
+/**
  * 跳转评分页面
  */
 function handleRating(row: RatingItem) {
@@ -304,7 +323,7 @@ async function handleDelete(row: RatingItem) {
     await ElMessageBox.confirm(`确认删除评分项目「${row.name}」吗？`, '删除确认', {
       confirmButtonText: '确认删除',
       cancelButtonText: '取消',
-      type: 'warning',
+      type: 'warning' as const,
     })
 
     await deleteRatingItem(row.id)

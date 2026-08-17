@@ -43,12 +43,12 @@
 </template>
 
 <script setup lang="ts">
-import {computed, nextTick, reactive, ref, watch} from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 
-import {ElMessage, type FormInstance, type FormRules} from 'element-plus'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 
-import {createRatingItem, updateRatingItem} from '@/api/rating/rating'
-import type {RatingItem} from '@/types'
+import { createRatingItem, updateRatingItem } from '@/api/rating/rating'
+import type { RatingItem } from '@/types'
 
 /**
  * 弹窗显示状态。
@@ -176,14 +176,8 @@ const formRules: FormRules<RatingItemForm> = {
          * 区分专家评委时，
          * 专家评分占比必须填写。
          */
-        if (
-          value === null ||
-          value === undefined ||
-          value === ''
-        ) {
-          callback(
-            new Error('请输入专家评分占比'),
-          )
+        if (value === null || value === undefined || value === '') {
+          callback(new Error('请输入专家评分占比'))
           return
         }
 
@@ -191,15 +185,8 @@ const formRules: FormRules<RatingItemForm> = {
          * 专家评分占比必须在 0% ～ 100% 之间，
          * 且不能取边界值。
          */
-        if (
-          Number(value) <= 0 ||
-          Number(value) >= 100
-        ) {
-          callback(
-            new Error(
-              '专家评分占比必须大于 0% 且小于 100%',
-            ),
-          )
+        if (Number(value) <= 0 || Number(value) >= 100) {
+          callback(new Error('专家评分占比必须大于 0% 且小于 100%'))
           return
         }
 
@@ -307,8 +294,6 @@ async function handleSubmit() {
   submitting.value = true
 
   try {
-
-
     if (isEdit.value) {
       /**
        * 修改模式
@@ -319,7 +304,7 @@ async function handleSubmit() {
         name: formData.name.trim(),
         description: formData.description.trim(),
         distinguishExpert: formData.distinguishExpert,
-        expertWeight: formData.expertWeight !== null ? formData.expertWeight * 100 : 50
+        expertWeight: formData.distinguishExpert && formData.expertWeight !== null ? formData.expertWeight / 100 : null,
       }
 
       if (id == null) {
@@ -338,13 +323,13 @@ async function handleSubmit() {
       /**
        * 新增模式
        */
-        // 提交前统一去除字符串首尾空格
+      // 提交前统一去除字符串首尾空格
       const requestData = {
-          name: formData.name.trim(),
-          description: formData.description.trim(),
-          distinguishExpert: formData.distinguishExpert,
-          expertWeight: formData.distinguishExpert && formData.expertWeight !== null ? formData.expertWeight / 100 : null,
-        }
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        distinguishExpert: formData.distinguishExpert,
+        expertWeight: formData.distinguishExpert && formData.expertWeight !== null ? formData.expertWeight / 100 : null,
+      }
       await createRatingItem(requestData)
 
       ElMessage.success('新增成功')

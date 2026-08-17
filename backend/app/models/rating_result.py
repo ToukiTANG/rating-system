@@ -1,6 +1,7 @@
 # app/models/rating_result.py
 
 from datetime import datetime
+from enum import IntEnum
 
 from sqlalchemy import (
     DateTime,
@@ -8,7 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
-    UniqueConstraint,
+    UniqueConstraint, SmallInteger,
 )
 from sqlalchemy.orm import (
     Mapped,
@@ -17,6 +18,16 @@ from sqlalchemy.orm import (
 
 from app.database.base import Base
 
+class ReviewerType(IntEnum):
+    """
+    评分人类型。
+    """
+
+    # 大众评委
+    PUBLIC = 0
+
+    # 专家评委
+    EXPERT = 1
 
 class RatingResultModel(Base):
     """
@@ -57,6 +68,15 @@ class RatingResultModel(Base):
     client_id: Mapped[str] = mapped_column(
         String(64),
         nullable=False,
+    )
+
+    # 评分人类型：
+    # 0 = 大众
+    # 1 = 专家
+    reviewer_type: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=False,
+        default=int(ReviewerType.PUBLIC),
     )
 
     # 用户评分。

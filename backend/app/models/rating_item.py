@@ -75,6 +75,14 @@ class RatingItemModel(Base):
         nullable=True,
     )
 
+    # 专家评分入口凭证。
+    #
+    # 仅当 distinguish_expert = True 时使用。
+    expert_token: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
     # 创建时间。
     create_time: Mapped[datetime] = mapped_column(
         DateTime,

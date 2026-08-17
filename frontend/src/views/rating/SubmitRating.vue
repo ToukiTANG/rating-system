@@ -12,11 +12,7 @@
               {{ ratingItem?.name || '评分项目' }}
             </h1>
 
-            <el-tag
-              v-if="ratingItem"
-              :type="statusInfo.type"
-              size="large"
-            >
+            <el-tag v-if="ratingItem" :type="statusInfo.type" size="large">
               {{ statusInfo.label }}
             </el-tag>
           </div>
@@ -29,14 +25,9 @@
       </div>
 
       <!-- 项目辅助信息 -->
-      <div
-        v-if="ratingItem"
-        class="meta-info"
-      >
+      <div v-if="ratingItem" class="meta-info">
         <div class="meta-item">
-          <span class="meta-label">
-            项目 ID
-          </span>
+          <span class="meta-label"> 项目 ID </span>
 
           <span class="meta-value">
             {{ ratingItem.id }}
@@ -44,9 +35,7 @@
         </div>
 
         <div class="meta-item">
-          <span class="meta-label">
-            创建时间
-          </span>
+          <span class="meta-label"> 创建时间 </span>
 
           <span class="meta-value">
             {{ ratingItem.createTime }}
@@ -56,10 +45,7 @@
 
       <!-- 右侧操作 -->
       <div class="header-actions">
-        <el-button
-          :loading="refreshing"
-          @click="handleRefreshStatus"
-        >
+        <el-button :loading="refreshing" @click="handleRefreshStatus">
           <el-icon>
             <Refresh />
           </el-icon>
@@ -72,10 +58,7 @@
     <!-- =========================
          页面主体
     ========================== -->
-    <main
-      v-loading="loading"
-      class="rating-content"
-    >
+    <main v-loading="loading" class="rating-content">
       <section class="score-panel">
         <!-- 已经提交 -->
         <template v-if="submitted">
@@ -85,49 +68,26 @@
             </el-icon>
           </div>
 
-          <div class="submitted-title">
-            评分已提交
-          </div>
+          <div class="submitted-title">评分已提交</div>
 
-          <div class="submitted-description">
-            您已经完成本次评分，无法再次提交。
-          </div>
+          <div class="submitted-description">您已经完成本次评分，无法再次提交。</div>
 
-          <div
-            v-if="submittedScore !== null"
-            class="submitted-score"
-          >
-            <el-rate
-              :model-value="submittedScore"
-              disabled
-              size="large"
-            />
+          <div v-if="submittedScore !== null" class="submitted-score">
+            <el-rate :model-value="submittedScore" disabled size="large" />
 
-            <span class="submitted-score-value">
-              {{ submittedScore.toFixed(1) }} 分
-            </span>
+            <span class="submitted-score-value"> {{ submittedScore.toFixed(1) }} 分 </span>
           </div>
         </template>
 
         <!-- 可以评分 -->
         <template v-else>
-          <div class="score-title">
-            请为该项目评分
-          </div>
+          <div class="score-title">请为该项目评分</div>
 
-          <div class="score-description">
-            请选择 1 ～ 5 分，提交后无法修改。
-          </div>
+          <div class="score-description">请选择 1 ～ 5 分，提交后无法修改。</div>
 
           <!-- 评分控件 -->
           <div class="score-rate">
-            <el-rate
-              v-model="score"
-              :max="5"
-              size="large"
-              show-score
-              score-template="{value} 分"
-            />
+            <el-rate v-model="score" :max="5" size="large" show-score score-template="{value} 分" />
           </div>
 
           <!-- 当前评分 -->
@@ -138,28 +98,14 @@
               分
             </template>
 
-            <template v-else>
-              请选择评分
-            </template>
+            <template v-else> 请选择评分 </template>
           </div>
 
           <!-- 提交按钮 -->
-          <el-button
-            type="primary"
-            size="large"
-            class="submit-button"
-            :disabled="!canSubmit"
-            :loading="submitting"
-            @click="handleSubmit"
-          >
-            提交评分
-          </el-button>
+          <el-button type="primary" size="large" class="submit-button" :disabled="!canSubmit" :loading="submitting" @click="handleSubmit"> 提交评分 </el-button>
 
           <!-- 项目非评分中 -->
-          <div
-            v-if="ratingItem && ratingItem.status !== 1"
-            class="status-tip"
-          >
+          <div v-if="ratingItem && ratingItem.status !== 1" class="status-tip">
             {{ ratingDisabledMessage }}
           </div>
         </template>
@@ -169,54 +115,61 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, ref,} from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
-import {CircleCheck, Refresh} from '@element-plus/icons-vue'
+import { CircleCheck, Refresh } from '@element-plus/icons-vue'
 
-import {ElMessage, ElMessageBox,} from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
-import {useRoute,} from 'vue-router'
+import { useRoute } from 'vue-router'
 
-import type {RatingItem,} from '@/types'
+import type { RatingItem } from '@/types'
 
-import {getRatingItem, getRatingStatus, submitScore,} from '@/api/rating/rating'
+import { getRatingItem, getRatingStatus, submitScore } from '@/api/rating/rating'
 
-import {getClientId,} from '@/utils/client'
-
+import { getClientId } from '@/utils/client'
 
 const route = useRoute()
 
+/**
+ * 专家评分凭证。
+ *
+ * 普通大众评分入口：
+ * /score/12
+ *
+ * 专家评分入口：
+ * /score/12?expertToken=xxxx
+ */
+const expertToken = computed<string | null>(() => {
+  const value = route.query.expertToken
 
+  return typeof value === 'string' ? value : null
+})
 
 /**
  * 当前评分项目。
  */
 const ratingItem = ref<RatingItem | null>(null)
 
-
 /**
  * 页面初始化状态。
  */
 const loading = ref(false)
-
 
 /**
  * 正在提交评分。
  */
 const submitting = ref(false)
 
-
 /**
  * 当前用户选择的评分。
  */
 const score = ref(0)
 
-
 /**
  * 当前客户端是否已经提交过评分。
  */
 const submitted = ref(false)
-
 
 /**
  * 当前客户端已经提交的评分。
@@ -248,7 +201,6 @@ const statusMap = {
   },
 } as const
 
-
 /**
  * 当前项目状态展示。
  */
@@ -265,35 +217,25 @@ const statusInfo = computed(() => {
   return statusMap[item.status]
 })
 
-
 /**
  * 从 URL 获取评分项目 ID。
  */
 const ratingItemId = computed<number | null>(() => {
   const id = Number(route.params.id)
 
-  if (
-    !Number.isInteger(id) ||
-    id <= 0
-  ) {
+  if (!Number.isInteger(id) || id <= 0) {
     return null
   }
 
   return id
 })
 
-
 /**
  * 当前是否允许提交评分。
  */
 const canSubmit = computed(() => {
-  return (
-    ratingItem.value?.status === 1 &&
-    !submitted.value &&
-    score.value > 0
-  )
+  return ratingItem.value?.status === 1 && !submitted.value && score.value > 0
 })
-
 
 /**
  * 项目不可评分时的提示。
@@ -316,7 +258,6 @@ const ratingDisabledMessage = computed(() => {
   return ''
 })
 
-
 /**
  * 页面初始化。
  */
@@ -336,13 +277,9 @@ async function init() {
      * 如果是从其他页面跳转进来，
      * 优先读取 history.state 中携带的项目数据。
      */
-    const stateItem =
-      window.history.state?.item as RatingItem | undefined
+    const stateItem = window.history.state?.item as RatingItem | undefined
 
-    if (
-      stateItem &&
-      stateItem.id === id
-    ) {
+    if (stateItem && stateItem.id === id) {
       ratingItem.value = {
         ...stateItem,
       }
@@ -402,7 +339,6 @@ async function handleRefreshStatus() {
   }
 }
 
-
 /**
  * 查询当前浏览器客户端评分状态。
  */
@@ -423,7 +359,6 @@ async function loadRatingStatus() {
   submittedScore.value = result.score
 }
 
-
 /**
  * 提交评分。
  */
@@ -439,15 +374,11 @@ async function handleSubmit() {
   }
 
   try {
-    await ElMessageBox.confirm(
-      `确认提交 ${score.value.toFixed(1)} 分吗？提交后无法修改。`,
-      '提交评分',
-      {
-        confirmButtonText: '确认提交',
-        cancelButtonText: '取消',
-        type: 'warning',
-      },
-    )
+    await ElMessageBox.confirm(`确认提交 ${score.value.toFixed(1)} 分吗？提交后无法修改。`, '提交评分', {
+      confirmButtonText: '确认提交',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
   } catch {
     return
   }
@@ -459,6 +390,7 @@ async function handleSubmit() {
       ratingItemId: item.id,
       clientId: getClientId(),
       score: score.value,
+      expertToken: expertToken.value,
     })
 
     /**
@@ -476,7 +408,6 @@ async function handleSubmit() {
     submitting.value = false
   }
 }
-
 
 onMounted(() => {
   init()
@@ -498,7 +429,6 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
-
 /* =========================
    顶部项目信息
 ========================= */
@@ -515,7 +445,6 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
-
 .header-top {
   display: flex;
   align-items: flex-start;
@@ -523,7 +452,6 @@ onMounted(() => {
 
   gap: 32px;
 }
-
 
 .header-left {
   flex: 1;
@@ -547,7 +475,6 @@ onMounted(() => {
   gap: 12px;
 }
 
-
 .rating-title {
   margin: 0;
 
@@ -564,7 +491,6 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-
 .description {
   margin-top: 10px;
 
@@ -575,7 +501,6 @@ onMounted(() => {
   font-size: 14px;
   line-height: 22px;
 }
-
 
 /* =========================
    项目辅助信息
@@ -593,7 +518,6 @@ onMounted(() => {
   border-top: 1px solid #f0f2f5;
 }
 
-
 .meta-item {
   display: flex;
   align-items: center;
@@ -603,16 +527,13 @@ onMounted(() => {
   font-size: 13px;
 }
 
-
 .meta-label {
   color: #909399;
 }
 
-
 .meta-value {
   color: #606266;
 }
-
 
 /* =========================
    页面主体
@@ -632,7 +553,6 @@ onMounted(() => {
 
   box-sizing: border-box;
 }
-
 
 /* =========================
    评分卡片
@@ -657,14 +577,12 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
-
 .score-title {
   color: #303133;
 
   font-size: 22px;
   font-weight: 600;
 }
-
 
 .score-description {
   margin-top: 12px;
@@ -674,11 +592,9 @@ onMounted(() => {
   font-size: 14px;
 }
 
-
 .score-rate {
   margin-top: 44px;
 }
-
 
 .score-value {
   height: 24px;
@@ -690,20 +606,17 @@ onMounted(() => {
   font-size: 15px;
 }
 
-
 .score-value strong {
   color: #303133;
 
   font-size: 20px;
 }
 
-
 .submit-button {
   width: 180px;
 
   margin-top: 36px;
 }
-
 
 .status-tip {
   margin-top: 20px;
@@ -712,7 +625,6 @@ onMounted(() => {
 
   font-size: 13px;
 }
-
 
 /* =========================
    已提交状态
@@ -725,7 +637,6 @@ onMounted(() => {
   line-height: 1;
 }
 
-
 .submitted-title {
   margin-top: 24px;
 
@@ -735,7 +646,6 @@ onMounted(() => {
   font-weight: 600;
 }
 
-
 .submitted-description {
   margin-top: 12px;
 
@@ -743,7 +653,6 @@ onMounted(() => {
 
   font-size: 14px;
 }
-
 
 .submitted-score {
   display: flex;
@@ -753,7 +662,6 @@ onMounted(() => {
 
   margin-top: 36px;
 }
-
 
 .submitted-score-value {
   color: #606266;
