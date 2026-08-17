@@ -25,7 +25,9 @@ COPY . .
 # 安装当前项目
 RUN uv sync \
     --frozen \
-    --no-dev
+    --no-dev \
+    --no-install-project \
+    --verbose
 
 # FastAPI 服务端口
 EXPOSE 8000
