@@ -44,3 +44,36 @@ export interface RatingStatistics {
   averageScore: number | null
   updateTime: string | null
 }
+
+/**
+ * 评委类型。
+ */
+export type ReviewerType = 0 | 1
+
+export interface QueryRatingResultParams {
+  page: number
+  pageSize: number
+
+  itemName?: string
+  reviewerType?: ReviewerType
+  score?: number
+}
+
+/**
+ * 评分结果列表项。
+ */
+export interface RatingResultItem {
+  id: number
+
+  ratingItemId: number
+
+  ratingItemName: string
+
+  clientId: string
+
+  reviewerType: ReviewerType
+
+  score: number
+
+  createTime: string
+}

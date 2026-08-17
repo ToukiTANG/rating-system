@@ -26,6 +26,14 @@ const router = createRouter({
           },
         },
         {
+          path: 'RatingResult',
+          name: 'RatingResult',
+          component: () => import('@/views/rating/RatingResult.vue'),
+          meta: {
+            title: '评分记录',
+          },
+        },
+        {
           path: 'Setting',
           name: 'Setting',
           component: () => import('@/views/SettingView.vue'),
@@ -46,9 +54,8 @@ const router = createRouter({
     {
       path: '/score/:id',
       name: 'SubmitRating',
-      component: () =>
-        import('@/views/rating/SubmitRating.vue'),
-    }
+      component: () => import('@/views/rating/SubmitRating.vue'),
+    },
   ],
 })
 

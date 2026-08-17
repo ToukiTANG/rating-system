@@ -15,7 +15,7 @@ from app.schemas.rating import (
     RatingStatisticsResponse,
     RatingResultResponse,
     SubmitScoreRequest,
-    RatingStatusResponse
+    RatingStatusResponse, RatingResultListItemResponse
 )
 from app.services.rating_service import RatingService
 
@@ -331,6 +331,58 @@ def get_rating_status(
     result = service.get_rating_status(
         item_id=ratingItemId,
         client_id=clientId,
+    )
+
+    return ApiResponse(
+        data=result,
+    )
+
+
+@router.get(
+    "/queryResults",
+    response_model=ApiResponse[
+        PageResult[
+            RatingResultListItemResponse
+        ]
+    ],
+)
+def query_results(
+        db: SessionDep,
+        page: int = Query(
+            default=1,
+            ge=1,
+        ),
+        pageSize: int = Query(
+            default=10,
+            ge=1,
+            le=100,
+        ),
+        itemName: str | None = Query(
+            default=None,
+        ),
+        reviewerType: int | None = Query(
+            default=None,
+            ge=0,
+            le=1,
+        ),
+        score: float | None = Query(
+            default=None,
+            ge=1,
+            le=5,
+        ),
+):
+    """
+    分页查询评分结果。
+    """
+
+    service = RatingService(db)
+
+    result = service.query_results(
+        page=page,
+        page_size=pageSize,
+        item_name=itemName,
+        reviewer_type=reviewerType,
+        score=score,
     )
 
     return ApiResponse(

@@ -19,7 +19,7 @@ from app.schemas.rating import (
     RatingStatisticsResponse,
     SubmitScoreRequest,
     RatingResultResponse,
-    RatingStatusResponse
+    RatingStatusResponse, RatingResultListItemResponse
 )
 
 
@@ -751,4 +751,120 @@ class RatingService:
             ),
             ratingCount=rating_count,
             updateTime=update_time,
+        )
+
+    def query_results(
+            self,
+            page: int,
+            page_size: int,
+            item_name: str | None = None,
+            reviewer_type: int | None = None,
+            score: float | None = None,
+    ) -> PageResult[RatingResultListItemResponse]:
+        """
+        分页查询所有评分结果。
+
+        查询评分结果的同时关联评分项目，
+        返回评分项目名称等信息。
+        """
+
+        # 查询条件。
+        conditions = []
+
+        if item_name:
+            conditions.append(
+                RatingItemModel.name.contains(
+                    item_name.strip()
+                )
+            )
+
+        if reviewer_type is not None:
+            conditions.append(
+                RatingResultModel.reviewer_type
+                == reviewer_type
+            )
+
+        if score is not None:
+            conditions.append(
+                RatingResultModel.score
+                == score
+            )
+
+        # =========================
+        # 查询总数
+        # =========================
+
+        count_stmt = (
+            select(
+                func.count(
+                    RatingResultModel.id
+                )
+            )
+            .join(
+                RatingItemModel,
+                RatingItemModel.id
+                == RatingResultModel.rating_item_id,
+            )
+            .where(*conditions)
+        )
+
+        total = self.db.scalar(
+            count_stmt
+        ) or 0
+
+        # =========================
+        # 查询当前页
+        # =========================
+
+        stmt = (
+            select(
+                RatingResultModel.id,
+                RatingResultModel.rating_item_id,
+                RatingItemModel.name.label(
+                    "rating_item_name"
+                ),
+                RatingResultModel.client_id,
+                RatingResultModel.reviewer_type,
+                RatingResultModel.score,
+                RatingResultModel.create_time,
+            )
+            .join(
+                RatingItemModel,
+                RatingItemModel.id
+                == RatingResultModel.rating_item_id,
+            )
+            .where(*conditions)
+            .order_by(
+                RatingResultModel.create_time.desc()
+            )
+            .offset(
+                (page - 1) * page_size
+            )
+            .limit(
+                page_size
+            )
+        )
+
+        rows = self.db.execute(
+            stmt
+        ).all()
+
+        items = [
+            RatingResultListItemResponse(
+                id=row.id,
+                ratingItemId=row.rating_item_id,
+                ratingItemName=row.rating_item_name,
+                clientId=row.client_id,
+                reviewerType=row.reviewer_type,
+                score=row.score,
+                createTime=row.create_time,
+            )
+            for row in rows
+        ]
+
+        return PageResult(
+            list=items,
+            total=total,
+            page=page,
+            pageSize=page_size,
         )

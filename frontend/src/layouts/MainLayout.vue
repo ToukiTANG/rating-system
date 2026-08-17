@@ -20,6 +20,11 @@
           <el-icon><Files /></el-icon>
           <span>评分项目</span>
         </el-menu-item>
+
+        <el-menu-item index="/RatingResult">
+          <el-icon><TrophyBase /></el-icon>
+          <span>评分记录</span>
+        </el-menu-item>
       </el-menu>
 
       <div class="sidebar-footer">
@@ -56,7 +61,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { HomeFilled, Files, Setting } from '@element-plus/icons-vue'
+import { HomeFilled, Files, Setting, TrophyBase } from '@element-plus/icons-vue'
 
 const route = useRoute()
 
