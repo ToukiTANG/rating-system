@@ -159,14 +159,18 @@ function handleHttpError(error: AxiosError<ApiResponse>) {
   ElMessage.error(error.message || '请求发生异常')
 }
 
-export function get<T>(url: string, params?: object): Promise<T> {
-  return request.get(url, {
+export async function get<T>(url: string, params?: object): Promise<T> {
+  const response = await request.get<ApiResponse<T>>(url, {
     params,
-  }) as Promise<T>
+  })
+
+  return response.data.data as T
 }
 
 export async function post<T>(url: string, data?: unknown): Promise<T> {
-  return (await request.post(url, data)) as Promise<T>
+  const response = await request.post<ApiResponse<T>>(url, data)
+
+  return response.data.data as T
 }
 
 export default request
