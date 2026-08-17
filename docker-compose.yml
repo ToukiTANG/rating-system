@@ -1,0 +1,35 @@
+services:
+  rating-backend:
+    container_name: rating-backend
+    build:
+      context: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env
+    volumes:
+      # SQLite 数据持久化到宿主机
+      - ./backend/data:/app/data
+    command:
+      - sh
+      - -c
+      - >
+        /app/.venv/bin/alembic upgrade head &&
+        exec /app/.venv/bin/fastapi run app/main.py
+        --host 0.0.0.0
+        --port 8000
+    networks:
+      - touki_net
+
+  rating-frontend:
+    container_name: rating-frontend
+    build:
+      context: ./frontend
+    restart: always
+    depends_on:
+      - rating-backend
+    networks:
+      - touki_net
+
+networks:
+  docker-work_touki_net:
+    external: true
