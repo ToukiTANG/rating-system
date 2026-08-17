@@ -4,15 +4,6 @@ import type { ApiResponse } from '@/types'
 import { ElMessage } from 'element-plus'
 
 /**
- * 后端统一响应结构
- */
-export interface ApiResponse<T = unknown> {
-  code: number
-  message: string
-  data: T
-}
-
-/**
  * 创建 Axios 实例
  */
 const request = axios.create({
@@ -55,7 +46,7 @@ request.interceptors.response.use(
      * 业务成功
      */
     if (result.code === 0) {
-      return result.data
+      return response
     }
 
     /**
