@@ -4,7 +4,7 @@
     <aside class="sidebar">
       <!-- Logo / 名称 -->
       <div class="sidebar-header">
-        <div class="logo">D</div>
+        <div class="logo">R</div>
 
         <span class="app-name">Rating System</span>
       </div>
