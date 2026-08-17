@@ -17,7 +17,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync \
     --frozen \
     --no-dev \
-    --no-install-project
+    --no-install-project \
+    --verbose
 
 # 再复制后端代码
 COPY . .
@@ -26,8 +27,6 @@ COPY . .
 RUN uv sync \
     --frozen \
     --no-dev \
-    --no-install-project \
-    --verbose
 
 # FastAPI 服务端口
 EXPOSE 8000
