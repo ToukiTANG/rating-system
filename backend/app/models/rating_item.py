@@ -1,9 +1,25 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, DateTime, Integer, SmallInteger, String, Boolean, Float
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    text, UniqueConstraint,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+
+if TYPE_CHECKING:
+    from app.models.rating_topic import RatingTopicModel
+    from app.models.rating_item_participant import (
+        RatingItemParticipantModel,
+    )
 
 
 class RatingItemModel(Base):
@@ -20,6 +36,19 @@ class RatingItemModel(Base):
             "status IN (0, 1, 2)",
             name="ck_rating_item_status",
         ),
+
+        UniqueConstraint(
+            "topic_id",
+            "name",
+            name="uq_rating_item_topic_name",
+        ),
+
+        Index(
+            "uq_rating_item_topic_active",
+            "topic_id",
+            unique=True,
+            sqlite_where=text("status = 1"),
+        ),
     )
 
     # 主键，自增 ID。
@@ -27,6 +56,22 @@ class RatingItemModel(Base):
         Integer,
         primary_key=True,
         autoincrement=True,
+    )
+
+    # 所属评分主题 ID。
+    topic_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey(
+            "rating_topic.id",
+            name="fk_rating_item_topic_id_rating_topic",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    # 所属评分主题。
+    topic: Mapped["RatingTopicModel | None"] = relationship(
+        back_populates="items",
     )
 
     # 项目名称。
@@ -62,27 +107,6 @@ class RatingItemModel(Base):
         index=True,
     )
 
-    # 是否区分专家评委。
-    distinguish_expert: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False,
-    )
-
-    # 专家评委占比。
-    expert_weight: Mapped[float | None] = mapped_column(
-        Float,
-        nullable=True,
-    )
-
-    # 专家评分入口凭证。
-    #
-    # 仅当 distinguish_expert = True 时使用。
-    expert_token: Mapped[str | None] = mapped_column(
-        String(64),
-        nullable=True,
-    )
-
     # 创建时间。
     create_time: Mapped[datetime] = mapped_column(
         DateTime,
@@ -99,4 +123,10 @@ class RatingItemModel(Base):
         nullable=False,
         default=datetime.now,
         onupdate=datetime.now,
+    )
+
+    participants: Mapped[
+        list["RatingItemParticipantModel"]
+    ] = relationship(
+        back_populates="item",
     )

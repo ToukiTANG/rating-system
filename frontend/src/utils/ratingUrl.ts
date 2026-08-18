@@ -1,20 +1,17 @@
-/**
- * 对外评分服务器地址。
- */
 const ratingServerUrl = import.meta.env.VITE_RATING_SERVER_URL
 
 /**
- * 生成大众评分地址。
+ * 获取大众评分地址。
  */
-export function getPublicRatingUrl(ratingItemId: number): string {
-  return new URL(`/score/${ratingItemId}`, ratingServerUrl).toString()
+export function getPublicRatingUrl(topicId: number): string {
+  return `${ratingServerUrl}/score/topic/${topicId}`
 }
 
 /**
- * 生成专家评分地址。
+ * 获取专家评分地址。
  */
-export function getExpertRatingUrl(ratingItemId: number, expertToken: string): string {
-  const url = new URL(`/score/${ratingItemId}`, ratingServerUrl)
+export function getExpertRatingUrl(topicId: number, expertToken: string): string {
+  const url = new URL(`${ratingServerUrl}/score/topic/${topicId}`)
 
   url.searchParams.set('expertToken', expertToken)
 

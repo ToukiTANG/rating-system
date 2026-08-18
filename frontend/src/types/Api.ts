@@ -5,3 +5,8 @@ export interface ApiResponse<T = unknown> {
 
   message: string | null
 }
+
+export interface PageResult<T> {
+  list: T[]
+  total: number
+}

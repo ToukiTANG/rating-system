@@ -1,14 +1,14 @@
 <template>
   <el-dialog v-model="visible" title="评分二维码" width="720px" destroy-on-close append-to-body @closed="handleClosed">
-    <div v-if="item" v-loading="loading" class="qr-dialog">
-      <!-- 项目信息 -->
-      <div class="project-info">
-        <div class="project-name">
-          {{ item.name }}
+    <div v-if="topic" v-loading="loading" class="qr-dialog">
+      <!-- 评分主题信息 -->
+      <div class="topic-info">
+        <div class="topic-name">
+          {{ topic.name }}
         </div>
 
-        <div class="project-description">
-          {{ item.description || '-' }}
+        <div class="topic-description">
+          {{ topic.description || '-' }}
         </div>
       </div>
 
@@ -16,7 +16,7 @@
       <div
         class="qr-list"
         :class="{
-          'qr-list-single': !item.distinguishExpert,
+          'qr-list-single': !topic.distinguishExpert,
         }"
       >
         <!-- =========================
@@ -49,7 +49,7 @@
         <!-- =========================
              专家评分二维码
         ========================== -->
-        <div v-if="item.distinguishExpert" class="qr-card">
+        <div v-if="topic.distinguishExpert" class="qr-card">
           <div class="qr-card-header">
             <span class="qr-card-title"> 专家评分 </span>
 
@@ -75,7 +75,7 @@
       </div>
 
       <!-- 专家提示 -->
-      <el-alert v-if="item.distinguishExpert" class="expert-tip" type="warning" :closable="false" show-icon>
+      <el-alert v-if="topic.distinguishExpert" class="expert-tip" type="warning" :closable="false" show-icon>
         专家二维码仅供专家评委使用，请避免将专家评分链接公开传播。
       </el-alert>
     </div>
@@ -95,7 +95,7 @@ import { CopyDocument } from '@element-plus/icons-vue'
 
 import { ElMessage } from 'element-plus'
 
-import type { RatingItem } from '@/types'
+import type { RatingTopic } from '@/types'
 
 import { getExpertRatingUrl, getPublicRatingUrl } from '@/utils/ratingUrl'
 
@@ -107,10 +107,13 @@ const visible = defineModel<boolean>({
 })
 
 /**
- * 当前评分项目。
+ * 当前评分主题。
+ *
+ * 二维码现在属于 RatingTopic，
+ * 不再属于某个 RatingItem。
  */
 const props = defineProps<{
-  item: RatingItem | null
+  topic: RatingTopic | null
 }>()
 
 /**
@@ -139,12 +142,17 @@ const publicQrCode = ref('')
 const expertQrCode = ref('')
 
 /**
- * 生成当前项目对应的二维码。
+ * 生成当前 Topic 对应的二维码。
+ *
+ * 二维码永久指向 Topic。
+ *
+ * 用户扫码后，由后端根据 Topic
+ * 自动定位当前 status=1 的 RatingItem。
  */
 async function generateQrCodes() {
-  const item = props.item
+  const topic = props.topic
 
-  if (!item) {
+  if (!topic) {
     return
   }
 
@@ -152,9 +160,9 @@ async function generateQrCodes() {
 
   try {
     /**
-     * 生成大众评分地址。
+     * 大众评分地址。
      */
-    publicUrl.value = getPublicRatingUrl(item.id)
+    publicUrl.value = getPublicRatingUrl(topic.id)
 
     publicQrCode.value = await QRCode.toDataURL(publicUrl.value, {
       width: 280,
@@ -163,20 +171,20 @@ async function generateQrCodes() {
     })
 
     /**
-     * 如果当前项目区分专家评委，
+     * 开启专家评分时，
      * 再生成专家评分二维码。
      */
-    if (item.distinguishExpert) {
-      if (!item.expertToken) {
+    if (topic.distinguishExpert) {
+      if (!topic.expertToken) {
         expertUrl.value = ''
         expertQrCode.value = ''
 
-        ElMessage.warning('当前评分项目缺少专家评分凭证')
+        ElMessage.warning('当前评分主题缺少专家评分凭证')
 
         return
       }
 
-      expertUrl.value = getExpertRatingUrl(item.id, item.expertToken)
+      expertUrl.value = getExpertRatingUrl(topic.id, topic.expertToken)
 
       expertQrCode.value = await QRCode.toDataURL(expertUrl.value, {
         width: 280,
@@ -225,22 +233,14 @@ function handleClosed() {
 }
 
 /**
- * Dialog 打开时生成二维码。
- *
- * item 发生变化后也重新生成，
- * 避免显示上一个评分项目的二维码。
+ * Dialog 打开或者 Topic 发生变化时，
+ * 重新生成二维码。
  */
-watch(
-  [visible, () => props.item],
-  ([newVisible, item]) => {
-    if (newVisible && item) {
-      generateQrCodes()
-    }
-  },
-  {
-    immediate: true,
-  },
-)
+watch([visible, () => props.topic], ([newVisible, topic]) => {
+  if (newVisible && topic) {
+    generateQrCodes()
+  }
+})
 </script>
 
 <style scoped>
@@ -249,24 +249,24 @@ watch(
 }
 
 /* =========================
-   项目信息
+   Topic 信息
 ========================= */
 
-.project-info {
+.topic-info {
   margin-bottom: 24px;
   padding-bottom: 20px;
 
   border-bottom: 1px solid #ebeef5;
 }
 
-.project-name {
+.topic-name {
   color: #303133;
 
   font-size: 18px;
   font-weight: 600;
 }
 
-.project-description {
+.topic-description {
   margin-top: 8px;
 
   color: #909399;

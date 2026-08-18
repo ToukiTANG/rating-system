@@ -9,6 +9,15 @@
     @closed="handleClosed"
   >
     <el-form ref="formRef" :model="formData" :rules="formRules" label-width="120px">
+      <!-- 所属评分主题 -->
+      <el-form-item label="评分主题" prop="topicId" required>
+        <el-select v-model="formData.topicId" placeholder="请选择评分主题" filterable style="width: 100%" :loading="topicLoading" :disabled="isEdit">
+          <el-option v-for="topic in topicList" :key="topic.id" :label="topic.name" :value="topic.id" />
+        </el-select>
+
+        <div v-if="isEdit" class="field-tip">评分项目创建后不可修改所属主题</div>
+      </el-form-item>
+
       <!-- 项目名称 -->
       <el-form-item label="项目名称" prop="name">
         <el-input v-model="formData.name" placeholder="请输入项目名称" maxlength="50" show-word-limit clearable />
@@ -17,15 +26,6 @@
       <!-- 项目描述 -->
       <el-form-item label="项目描述" prop="description">
         <el-input v-model="formData.description" type="textarea" placeholder="请输入项目描述" :rows="4" maxlength="500" show-word-limit />
-      </el-form-item>
-
-      <!-- 项目描述 -->
-      <el-form-item label="区分专家评委" prop="distinguishExpert">
-        <el-switch v-model="formData.distinguishExpert" active-text="是" inactive-text="否" />
-      </el-form-item>
-      <el-form-item v-if="formData.distinguishExpert" label="专家评分占比" prop="expertWeight" required>
-        <el-input-number v-model="formData.expertWeight" :min="1" :max="99" :step="5" :precision="0" />
-        <span class="unit"> % </span>
       </el-form-item>
     </el-form>
 
@@ -47,8 +47,11 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 
-import { createRatingItem, updateRatingItem } from '@/api/rating/rating'
-import type { RatingItem } from '@/types'
+import { createRatingItem, updateRatingItem } from '@/api/rating/rating.ts'
+
+import { queryRatingTopic } from '@/api/rating/RatingTopic.ts'
+
+import type { RatingTopic, RatingItem } from '@/types'
 
 /**
  * 弹窗显示状态。
@@ -80,9 +83,6 @@ const props = defineProps<{
  * mode：
  *   add  - 新增成功
  *   edit - 编辑成功
- *
- * item：
- *   后端返回的最新评分项目数据
  */
 const emit = defineEmits<{
   (e: 'success', mode: 'add' | 'edit'): void
@@ -91,25 +91,31 @@ const emit = defineEmits<{
 /**
  * 表单数据。
  *
- * 不直接修改 props.item，
- * 避免编辑过程中直接影响父组件表格中的原始数据。
+ * RatingItem 的专家配置已经迁移到 RatingTopic，
+ * 因此当前表单只维护：
+ *
+ * - topicId
+ * - name
+ * - description
  */
 interface RatingItemForm {
+  topicId: number | null
   name: string
   description: string
-  distinguishExpert: boolean
-  expertWeight: number | null
 }
 
 const formRef = ref<FormInstance>()
 
 const submitting = ref(false)
 
+const topicLoading = ref(false)
+
+const topicList = ref<RatingTopic[]>([])
+
 const formData = reactive<RatingItemForm>({
+  topicId: null,
   name: '',
   description: '',
-  distinguishExpert: false,
-  expertWeight: 60,
 })
 
 /**
@@ -130,6 +136,30 @@ const dialogTitle = computed(() => {
  * 表单校验规则。
  */
 const formRules: FormRules<RatingItemForm> = {
+  topicId: [
+    {
+      validator: (_rule, value, callback) => {
+        /**
+         * 编辑模式下所属 Topic 不允许修改，
+         * 并且 Update API 不需要 topicId，
+         * 因此无需再次校验。
+         */
+        if (isEdit.value) {
+          callback()
+          return
+        }
+
+        if (value == null) {
+          callback(new Error('请选择评分主题'))
+          return
+        }
+
+        callback()
+      },
+      trigger: 'change',
+    },
+  ],
+
   name: [
     {
       required: true,
@@ -147,54 +177,36 @@ const formRules: FormRules<RatingItemForm> = {
   description: [
     {
       required: true,
+      message: '请输入项目描述',
+      trigger: 'blur',
+    },
+    {
       max: 500,
       message: '项目描述长度不能超过 500 个字符',
       trigger: 'blur',
     },
   ],
+}
 
-  distinguishExpert: [
-    {
-      required: true,
-      trigger: 'change',
-      message: '请选择是否需要区分专家评委',
-    },
-  ],
-  expertWeight: [
-    {
-      validator: (_rule, value, callback) => {
-        /**
-         * 不区分专家评委时，
-         * 不需要校验专家评分占比。
-         */
-        if (!formData.distinguishExpert) {
-          callback()
-          return
-        }
+/**
+ * 加载评分主题。
+ *
+ * 当前用于 RatingItem 新增时选择所属 Topic，
+ * 以及编辑时展示当前 Topic。
+ */
+async function loadTopics() {
+  topicLoading.value = true
 
-        /**
-         * 区分专家评委时，
-         * 专家评分占比必须填写。
-         */
-        if (value === null || value === undefined || value === '') {
-          callback(new Error('请输入专家评分占比'))
-          return
-        }
+  try {
+    const response = await queryRatingTopic({
+      page: 1,
+      pageSize: 100,
+    })
 
-        /**
-         * 专家评分占比必须在 0% ～ 100% 之间，
-         * 且不能取边界值。
-         */
-        if (Number(value) <= 0 || Number(value) >= 100) {
-          callback(new Error('专家评分占比必须大于 0% 且小于 100%'))
-          return
-        }
-
-        callback()
-      },
-      trigger: ['blur', 'change'],
-    },
-  ],
+    topicList.value = response.list
+  } finally {
+    topicLoading.value = false
+  }
 }
 
 /**
@@ -206,11 +218,21 @@ const formRules: FormRules<RatingItemForm> = {
  * 编辑模式：
  *   将父组件传入的 item 数据复制到本地表单。
  */
-function initForm() {
+async function initForm() {
+  /**
+   * 先加载 Topic，
+   * 保证 Select 能正确展示 Topic 名称。
+   */
+  await loadTopics()
+
   if (isEdit.value && props.item) {
+    formData.topicId = props.item.topicId
+
     formData.name = props.item.name
+
     formData.description = props.item.description ?? ''
   } else {
+    formData.topicId = null
     formData.name = ''
     formData.description = ''
   }
@@ -219,23 +241,13 @@ function initForm() {
    * 等待 DOM 和 Form 状态更新完成后，
    * 清除上一次打开弹窗留下的校验信息。
    */
-  nextTick(() => {
+  await nextTick(() => {
     formRef.value?.clearValidate()
   })
 }
 
 /**
  * 每次打开弹窗时重新初始化表单。
- *
- * 这样可以保证：
- *
- * 第一次新增
- *     ↓
- * 关闭
- *     ↓
- * 再次编辑
- *
- * 时不会残留上一次的数据。
  */
 watch(
   () => visible.value,
@@ -247,11 +259,8 @@ watch(
 )
 
 /**
- * 当弹窗已经打开，但父组件切换了 item 时，
- * 同步更新表单数据。
- *
- * 正常情况下很少触发，
- * 但可以让组件行为更加完整。
+ * 弹窗打开过程中父组件切换 item 时，
+ * 同步更新表单。
  */
 watch(
   () => props.item,
@@ -274,17 +283,16 @@ function handleCancel() {
 }
 
 /**
- * 提交表单。
- */
-/**
- * 提交新增 / 修改表单
+ * 提交新增 / 修改表单。
  */
 async function handleSubmit() {
   if (!formRef.value || submitting.value) {
     return
   }
 
-  // 先执行表单校验
+  /**
+   * 先执行表单校验。
+   */
   try {
     await formRef.value.validate()
   } catch {
@@ -295,49 +303,14 @@ async function handleSubmit() {
 
   try {
     if (isEdit.value) {
-      /**
-       * 修改模式
-       */
-      const id = props.item?.id
-      // 提交前统一去除字符串首尾空格
-      const requestData = {
-        name: formData.name.trim(),
-        description: formData.description.trim(),
-        distinguishExpert: formData.distinguishExpert,
-        expertWeight: formData.distinguishExpert && formData.expertWeight !== null ? formData.expertWeight / 100 : null,
-      }
-
-      if (id == null) {
-        return
-      }
-
-      await updateRatingItem({
-        id,
-        ...requestData,
-      })
-
-      ElMessage.success('修改成功')
-
-      emit('success', 'edit')
+      await submitUpdate()
     } else {
-      /**
-       * 新增模式
-       */
-      // 提交前统一去除字符串首尾空格
-      const requestData = {
-        name: formData.name.trim(),
-        description: formData.description.trim(),
-        distinguishExpert: formData.distinguishExpert,
-        expertWeight: formData.distinguishExpert && formData.expertWeight !== null ? formData.expertWeight / 100 : null,
-      }
-      await createRatingItem(requestData)
-
-      ElMessage.success('新增成功')
-
-      emit('success', 'add')
+      await submitAdd()
     }
 
-    // 操作成功后关闭弹窗
+    /**
+     * 操作成功后关闭弹窗。
+     */
     visible.value = false
   } catch {
     /**
@@ -350,9 +323,57 @@ async function handleSubmit() {
 }
 
 /**
+ * 新增 RatingItem。
+ *
+ * 新增时必须指定所属 Topic。
+ */
+async function submitAdd() {
+  const topicId = formData.topicId
+
+  if (topicId == null) {
+    return
+  }
+
+  await createRatingItem({
+    topicId,
+    name: formData.name.trim(),
+    description: formData.description.trim(),
+  })
+
+  ElMessage.success('新增成功')
+
+  emit('success', 'add')
+}
+
+/**
+ * 修改 RatingItem。
+ *
+ * RatingItem 创建后不允许修改所属 Topic，
+ * 因此 Update API 不发送 topicId。
+ */
+async function submitUpdate() {
+  const id = props.item?.id
+
+  if (id == null) {
+    return
+  }
+
+  await updateRatingItem({
+    id,
+    name: formData.name.trim(),
+    description: formData.description.trim(),
+  })
+
+  ElMessage.success('修改成功')
+
+  emit('success', 'edit')
+}
+
+/**
  * Dialog 完全关闭后清理本地状态。
  */
 function handleClosed() {
+  formData.topicId = null
   formData.name = ''
   formData.description = ''
 
@@ -365,5 +386,15 @@ function handleClosed() {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.field-tip {
+  width: 100%;
+  margin-top: 4px;
+
+  font-size: 12px;
+  line-height: 18px;
+
+  color: #909399;
 }
 </style>

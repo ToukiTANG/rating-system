@@ -50,7 +50,6 @@
             {{ ratingItem.id }}
           </span>
         </div>
-
       </div>
     </header>
 
@@ -65,14 +64,14 @@
         <!-- 当前平均分 -->
         <div class="score-content">
           <span class="score-value">
-            {{ statistics.averageScore === null ? '--' : statistics.averageScore.toFixed(2) }}
+            {{ statistics.ratingCount === 0 ? '--' : statistics.finalScore.toFixed(2) }}
           </span>
 
-          <span class="score-total"> / 5.00 </span>
+          <span class="score-total"> / 100 </span>
         </div>
 
         <!-- 无数据提示 -->
-        <div v-if="statistics.averageScore === null" class="score-empty">暂无评分数据</div>
+        <div v-if="statistics.ratingCount === 0" class="score-empty">暂无评分数据</div>
 
         <!-- 最后更新时间 -->
         <div v-else class="score-update-time">
@@ -141,7 +140,8 @@ const finishing = ref(false)
  * 当前评分统计信息。
  */
 const statistics = reactive<RatingStatistics>({
-  averageScore: null,
+  finalScore: 0,
+  ratingCount: 0,
   updateTime: null,
 })
 
@@ -273,8 +273,8 @@ async function loadStatistics() {
     id: item.id,
   })
 
-  statistics.averageScore = result.averageScore
-
+  statistics.finalScore = result.finalScore
+  statistics.ratingCount = result.ratingCount
   statistics.updateTime = result.updateTime
 }
 

@@ -47,14 +47,27 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="评分" width="180" align="center">
+          <!-- =========================
+               评分 / 点赞
+          ========================== -->
+          <el-table-column label="评分结果" width="180" align="center">
             <template #default="{ row }">
-              <div class="score-cell">
-                <el-rate :model-value="row.score" disabled />
-
-                <span class="score-number">
-                  {{ row.score.toFixed(1) }}
+              <!-- 专家评分 -->
+              <div v-if="row.reviewerType === 1" class="expert-score-cell">
+                <span class="expert-score-number">
+                  {{ formatExpertScore(row.score) }}
                 </span>
+
+                <span class="score-unit"> 分 </span>
+              </div>
+
+              <!-- 大众点赞 -->
+              <div v-else class="public-score-cell">
+                <span class="like-icons">
+                  {{ row.score === 2 ? '👍 👍' : '👍' }}
+                </span>
+
+                <span class="like-count"> {{ row.score }} 个赞 </span>
               </div>
             </template>
           </el-table-column>
@@ -97,6 +110,7 @@ import { onMounted, reactive, ref } from 'vue'
 import type { RatingResultItem, ReviewerType } from '@/types'
 
 import { queryRatingResults } from '@/api/rating/rating'
+
 import { formatDateTime } from '@/utils/date.ts'
 
 /**
@@ -105,11 +119,9 @@ import { formatDateTime } from '@/utils/date.ts'
 const searchForm = reactive<{
   itemName: string
   reviewerType: ReviewerType | null
-  score: number | null
 }>({
   itemName: '',
   reviewerType: null,
-  score: null,
 })
 
 /**
@@ -140,13 +152,17 @@ async function loadData() {
   try {
     const result = await queryRatingResults({
       page: pagination.page,
+
       pageSize: pagination.pageSize,
 
       itemName: searchForm.itemName.trim() || undefined,
 
+      /**
+       * reviewerType = 0 是合法值，
+       * 因此这里必须使用 ??，
+       * 不能使用 ||。
+       */
       reviewerType: searchForm.reviewerType ?? undefined,
-
-      score: searchForm.score ?? undefined,
     })
 
     tableData.value = result.list
@@ -171,8 +187,8 @@ function handleSearch() {
  */
 function handleReset() {
   searchForm.itemName = ''
+
   searchForm.reviewerType = null
-  searchForm.score = null
 
   pagination.page = 1
 
@@ -189,8 +205,23 @@ function handleSizeChange() {
 }
 
 /**
- * 客户端 ID 只展示部分内容，
- * 完整值仍然可以通过 Tooltip 查看。
+ * 格式化专家评分。
+ *
+ * 专家评分采用 0 ~ 100 分制。
+ *
+ * 当前后端 score 类型仍然为 float，
+ * 因此这里兼容整数和小数。
+ */
+function formatExpertScore(score: number): string {
+  if (Number.isInteger(score)) {
+    return score.toString()
+  }
+
+  return score.toFixed(1)
+}
+
+/**
+ * 客户端 ID 只展示部分内容。
  */
 function formatClientId(clientId: string): string {
   if (clientId.length <= 16) {
@@ -279,19 +310,53 @@ onMounted(() => {
   min-height: 0;
 }
 
-.score-cell {
+/* =========================
+   专家评分
+========================= */
+
+.expert-score-cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+
+  gap: 4px;
+}
+
+.expert-score-number {
+  color: #303133;
+
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.score-unit {
+  color: #909399;
+
+  font-size: 13px;
+}
+
+/* =========================
+   大众点赞
+========================= */
+
+.public-score-cell {
   display: flex;
   align-items: center;
   justify-content: center;
 
-  gap: 8px;
+  gap: 10px;
 }
 
-.score-number {
-  min-width: 30px;
+.like-icons {
+  font-size: 20px;
 
+  white-space: nowrap;
+}
+
+.like-count {
   color: #606266;
 
+  font-size: 14px;
   font-weight: 500;
 }
 

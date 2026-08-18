@@ -3,6 +3,12 @@
     <!-- 搜索区域 -->
     <section class="search-panel">
       <el-form :model="searchForm" inline class="search-form" @submit.prevent>
+        <el-form-item label="评分主题">
+          <el-select v-model="searchForm.topicId" placeholder="请选择评分主题" clearable filterable style="width: 220px">
+            <el-option v-for="topic in topicList" :key="topic.id" :label="topic.name" :value="topic.id" />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="项目名称">
           <el-input v-model="searchForm.name" placeholder="请输入项目名称" clearable style="width: 220px" @keyup.enter="handleSearch" />
         </el-form-item>
@@ -10,7 +16,9 @@
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 160px">
             <el-option label="初始化" :value="0" />
+
             <el-option label="评分中" :value="1" />
+
             <el-option label="已评分" :value="2" />
           </el-select>
         </el-form-item>
@@ -28,7 +36,7 @@
       <!-- 表格顶部工具栏 -->
       <div class="table-toolbar">
         <div class="toolbar-left">
-          <span class="table-title">评分项目列表</span>
+          <span class="table-title"> 评分项目列表 </span>
         </div>
 
         <div class="toolbar-right">
@@ -36,6 +44,7 @@
             <el-icon>
               <Plus />
             </el-icon>
+
             新增评分项目
           </el-button>
         </div>
@@ -45,26 +54,15 @@
       <el-table :data="tableData" v-loading="loading" border stripe style="width: 100%">
         <el-table-column type="index" label="序号" width="70" align="center" />
 
+        <el-table-column label="所属主题" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ getTopicName(row.topicId) }}
+          </template>
+        </el-table-column>
+
         <el-table-column prop="name" label="项目名称" min-width="150" show-overflow-tooltip />
 
         <el-table-column prop="description" label="项目描述" min-width="260" show-overflow-tooltip />
-        <el-table-column label="区分专家评委" width="130" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.distinguishExpert ? 'success' : 'info'">
-              {{ row.distinguishExpert ? '是' : '否' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="专家评委占比" width="140" align="center">
-          <template #default="{ row }">
-            <span v-if="row.distinguishExpert && row.expertWeight !== null">
-              {{ formatExpertWeight(row.expertWeight) }}
-            </span>
-
-            <span v-else class="empty-value"> -- </span>
-          </template>
-        </el-table-column>
 
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
@@ -74,11 +72,12 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="250" fixed="right" align="center" class-name="operation-column">
+        <el-table-column label="操作" width="200" fixed="right" align="center" class-name="operation-column">
           <template #default="{ row }">
             <el-button type="primary" :disabled="row.status !== 0" link @click="handleEdit(row)"> 编辑 </el-button>
-            <el-button type="primary" :disabled="row.status !== 0" link @click="GenerateQR(row)"> 生成二维码 </el-button>
-            <el-button type="warning" :disabled="row.status === 3" link @click="handleRating(row)"> 评分 </el-button>
+
+            <el-button type="warning" link @click="handleRating(row)"> 评分 </el-button>
+
             <el-button type="danger" link @click="handleDelete(row)"> 删除 </el-button>
           </template>
         </el-table-column>
@@ -101,20 +100,28 @@
         />
       </div>
     </section>
+
     <AddOrUpdate v-model="dialogVisible" :item="currentItem" @success="handleAddOrUpdateSuccess" />
-    <QrCodeDialog v-model="qrCodeDialogVisible" :item="qrCodeItem" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+
 import { ElMessage, ElMessageBox } from 'element-plus'
+
 import { Plus } from '@element-plus/icons-vue'
-import type { RatingItem, SearchForm } from '@/types'
-import { deleteRatingItem, getRatingItemList } from '@/api/rating/rating.ts'
-import AddOrUpdate from '@/views/rating/AddOrUpdate.vue'
+
 import { useRouter } from 'vue-router'
-import QrCodeDialog from '@/views/rating/QrCodeDialog.vue'
+
+
+import type { RatingItem, SearchForm,RatingTopic } from '@/types'
+
+import { deleteRatingItem, getRatingItemList } from '@/api/rating/rating.ts'
+
+import { queryRatingTopic } from '@/api/rating/RatingTopic.ts'
+
+import AddOrUpdate from '@/views/rating/Item/AddOrUpdate.vue'
 
 interface Pagination {
   page: number
@@ -132,10 +139,12 @@ const statusMap: Record<number, StatusInfo> = {
     label: '初始化',
     type: 'info',
   },
+
   1: {
     label: '评分中',
     type: 'warning',
   },
+
   2: {
     label: '已评分',
     type: 'success',
@@ -148,7 +157,17 @@ const loading = ref(false)
 
 const router = useRouter()
 
+/**
+ * Topic 列表。
+ *
+ * 当前页面用于：
+ * 1. Topic 搜索条件
+ * 2. 根据 topicId 显示 Topic 名称
+ */
+const topicList = ref<RatingTopic[]>([])
+
 const searchForm = reactive<SearchForm>({
+  topicId: null,
   name: '',
   status: null,
 })
@@ -156,17 +175,10 @@ const searchForm = reactive<SearchForm>({
 const pagination = reactive<Pagination>({
   page: 1,
   pageSize: 10,
-  total: 3,
+  total: 0,
 })
 
 const tableData = ref<RatingItem[]>([])
-
-const qrCodeDialogVisible = ref(false)
-
-/**
- * 当前准备生成二维码的评分项目。
- */
-const qrCodeItem = ref<RatingItem | null>(null)
 
 /**
  * 当前正在编辑的评分项目。
@@ -180,24 +192,53 @@ const qrCodeItem = ref<RatingItem | null>(null)
 const currentItem = ref<RatingItem | null>(null)
 
 /**
- * 查询
+ * Topic ID -> Topic Name。
+ *
+ * 避免表格每一行反复遍历 topicList。
+ */
+const topicNameMap = computed(() => {
+  return new Map(topicList.value.map((topic) => [topic.id, topic.name]))
+})
+
+/**
+ * 查询 Topic 名称。
+ */
+function getTopicName(topicId: number | null): string {
+  if (topicId == null) {
+    return '--'
+  }
+
+  return topicNameMap.value.get(topicId) ?? `Topic #${topicId}`
+}
+
+/**
+ * 加载 Topic。
+ *
+ * 当前主要用于筛选和显示 Topic 名称。
+ */
+async function loadTopics() {
+  const response = await queryRatingTopic({
+    page: 1,
+    pageSize: 100,
+  })
+
+  topicList.value = response.list
+}
+
+/**
+ * 查询。
  */
 function handleSearch() {
   pagination.page = 1
-
-  console.log('搜索条件:', {
-    ...searchForm,
-    page: pagination.page,
-    pageSize: pagination.pageSize,
-  })
 
   loadData()
 }
 
 /**
- * 重置查询条件
+ * 重置查询条件。
  */
 function handleReset() {
+  searchForm.topicId = null
   searchForm.name = ''
   searchForm.status = null
 
@@ -207,36 +248,30 @@ function handleReset() {
 }
 
 /**
- * 格式化专家评委占比。
- *
- * 后端存储：
- * 0.6
- *
- * 页面展示：
- * 60%
- */
-function formatExpertWeight(expertWeight: number): string {
-  return `${Math.round(expertWeight * 100)}%`
-}
-
-/**
- * 加载数据
+ * 加载 RatingItem。
  */
 async function loadData() {
   loading.value = true
 
   try {
     const response = await getRatingItemList({
+      topicId: searchForm.topicId ?? undefined,
+
       name: searchForm.name || undefined,
-      status: searchForm.status || undefined,
+
+      // 注意：
+      // status = 0 是合法值，
+      // 不能使用 || undefined。
+      status: searchForm.status ?? undefined,
+
       page: pagination.page,
+
       pageSize: pagination.pageSize,
     })
 
     tableData.value = response.list
-    pagination.total = response.total
 
-    console.log('load rating items')
+    pagination.total = response.total
   } finally {
     loading.value = false
   }
@@ -246,8 +281,6 @@ async function loadData() {
  * 打开新增弹窗。
  */
 function handleAdd() {
-  // 新增时必须清空当前编辑对象，
-  // AddOrUpdate 会据此判断当前是新增模式。
   currentItem.value = null
 
   dialogVisible.value = true
@@ -257,12 +290,6 @@ function handleAdd() {
  * 打开编辑弹窗。
  */
 function handleEdit(row: RatingItem) {
-  /**
-   * 建议复制一份 row。
-   *
-   * 避免子组件修改表单时，
-   * 意外直接影响表格中的原始对象。
-   */
   currentItem.value = {
     ...row,
   }
@@ -271,23 +298,16 @@ function handleEdit(row: RatingItem) {
 }
 
 /**
- * 生成二维码
- */
-function GenerateQR(row: RatingItem) {
-  qrCodeItem.value = row
-
-  qrCodeDialogVisible.value = true
-}
-
-/**
- * 跳转评分页面
+ * 跳转评分管理页面。
  */
 function handleRating(row: RatingItem) {
   router.push({
     name: 'Rating',
+
     params: {
       id: row.id,
     },
+
     state: {
       item: {
         ...row,
@@ -300,23 +320,15 @@ function handleRating(row: RatingItem) {
  * 新增 / 修改成功后的统一处理。
  */
 function handleAddOrUpdateSuccess(mode: 'add' | 'edit') {
-  /**
-   * 新增数据通常按 ID 倒序排列，
-   * 因此新增成功后跳到第一页，
-   * 方便立即看到刚新增的数据。
-   */
   if (mode === 'add') {
     pagination.page = 1
   }
 
-  /**
-   * 重新查询数据库中的最新数据。
-   */
   loadData()
 }
 
 /**
- * 删除
+ * 删除。
  */
 async function handleDelete(row: RatingItem) {
   try {
@@ -327,16 +339,19 @@ async function handleDelete(row: RatingItem) {
     })
 
     await deleteRatingItem(row.id)
+
     pagination.page = 1
+
     await loadData()
+
     ElMessage.success('删除成功')
   } catch {
-    // 用户取消，不需要处理
+    // 用户取消，不需要处理。
   }
 }
 
 /**
- * 修改每页数量
+ * 修改每页数量。
  */
 function handlePageSizeChange(pageSize: number) {
   pagination.pageSize = pageSize
@@ -346,7 +361,7 @@ function handlePageSizeChange(pageSize: number) {
 }
 
 /**
- * 翻页
+ * 翻页。
  */
 function handlePageChange(page: number) {
   pagination.page = page
@@ -354,8 +369,10 @@ function handlePageChange(page: number) {
   loadData()
 }
 
-onMounted(() => {
-  loadData()
+onMounted(async () => {
+  await loadTopics()
+
+  await loadData()
 })
 </script>
 

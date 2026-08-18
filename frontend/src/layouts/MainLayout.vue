@@ -16,6 +16,11 @@
           <span>首页</span>
         </el-menu-item>
 
+        <el-menu-item index="/RatingTopic">
+          <el-icon><Postcard /></el-icon>
+          <span>评分主题</span>
+        </el-menu-item>
+
         <el-menu-item index="/RatingItem">
           <el-icon><Files /></el-icon>
           <span>评分项目</span>
@@ -61,7 +66,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { HomeFilled, Files, Setting, TrophyBase } from '@element-plus/icons-vue'
+import { HomeFilled, Files, Setting, TrophyBase, Postcard } from '@element-plus/icons-vue'
 
 const route = useRoute()
 

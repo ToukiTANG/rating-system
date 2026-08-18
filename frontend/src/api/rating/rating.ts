@@ -1,32 +1,48 @@
 import { get, post } from '../request'
-import type { PageResult, QueryRatingResultParams, RatingItem, RatingItemQuery, RatingResultItem, RatingStatistics, UpdateRatingItemRequest } from '@/types'
+
+import type {
+  AddRatingItemRequest,
+  PageResult,
+  QueryRatingResultParams,
+  RatingItem,
+  RatingItemQueryParams,
+  RatingResultItem,
+  RatingStatistics,
+  UpdateRatingItemRequest,
+} from '@/types'
 
 /**
- * 获取评分项目列表
+ * 获取评分项目列表。
  */
-export function getRatingItemList(params: RatingItemQuery) {
+export function getRatingItemList(params: RatingItemQueryParams) {
   return get<PageResult<RatingItem>>('/rating/items', params as unknown as Record<string, unknown>)
 }
 
 /**
- * 新增评分项目
+ * 新增评分项目。
+ *
+ * 新增时必须指定所属 Topic。
  */
-export function createRatingItem(data: Partial<RatingItem>) {
+export function createRatingItem(data: AddRatingItemRequest) {
   return post<RatingItem>('/rating/addItem', data)
 }
 
 /**
- * 修改评分项目
+ * 修改评分项目。
+ *
+ * RatingItem 创建后不允许修改所属 Topic。
  */
 export function updateRatingItem(data: UpdateRatingItemRequest) {
   return post<RatingItem>('/rating/updateItem', data)
 }
 
 /**
- * 删除评分项目
+ * 删除评分项目。
  */
 export function deleteRatingItem(id: number) {
-  return post<void>(`/rating/deleteItem`, { id: id })
+  return post<void>('/rating/deleteItem', {
+    id,
+  })
 }
 
 /**
@@ -57,9 +73,25 @@ export function getRatingStatistics(params: { id: number }) {
   return get<RatingStatistics>('/rating/getStatistics', params)
 }
 
+/**
+ * 当前客户端针对某个 RatingItem
+ * 的评分提交状态。
+ */
 export interface RatingClientStatus {
   submitted: boolean
+
+  /**
+   * 专家：
+   * 0 ~ 100
+   *
+   * 大众：
+   * 1 或 2，表示点赞数量。
+   *
+   * 未评分：
+   * null
+   */
   score: number | null
+
   submitTime: string | null
 }
 
@@ -68,11 +100,31 @@ export interface GetRatingStatusParams {
   clientId: string
 }
 
+/**
+ * 提交评分请求。
+ *
+ * score：
+ *
+ * 专家评委：
+ * 0 ~ 100
+ *
+ * 大众评委：
+ * 1 或 2
+ */
 export interface SubmitScoreRequest {
   ratingItemId: number
+
   clientId: string
+
   score: number
-  expertToken: string | null
+
+  /**
+   * 大众评委不传。
+   *
+   * 专家评委从 Topic 专家二维码
+   * URL 中获取。
+   */
+  expertToken?: string
 }
 
 /**

@@ -1,52 +1,87 @@
 export type RatingStatus = 0 | 1 | 2
 
 export interface SearchForm {
+  topicId: number | null
   name: string
-  status: null | RatingStatus
+  status: RatingStatus | null
 }
 
 export interface RatingItem {
   id: number
+
+  /**
+   * 所属评分主题。
+   *
+   * 当前保留 null，
+   * 用于兼容历史 RatingItem 数据。
+   */
+  topicId: number
+
   name: string
+
   description: string
+
   status: RatingStatus
-  distinguishExpert: boolean
-  expertWeight: number | null
-  expertToken: string | null
+
   createTime: string
+
   updateTime: string
 }
 
-export interface RatingItemQuery {
+export interface RatingItemQueryParams {
+  topicId?: number
   name?: string
   status?: RatingStatus
-  page: number
-  pageSize: number
+  page?: number
+  pageSize?: number
 }
 
 /**
- * 修改评分项目请求参数
+ * 新增评分项目请求参数。
+ */
+export interface AddRatingItemRequest {
+  topicId: number
+  name: string
+  description: string
+}
+
+/**
+ * 修改评分项目请求参数。
+ *
+ * RatingItem 创建后不能修改所属 Topic，
+ * 因此这里不包含 topicId。
  */
 export interface UpdateRatingItemRequest {
   id: number
   name: string
   description: string
-  distinguishExpert: boolean
-  expertWeight: number | null
 }
 
-export interface PageResult<T> {
-  list: T[]
-  total: number
-}
-
+/**
+ * 实时评分统计。
+ */
 export interface RatingStatistics {
-  averageScore: number | null
+  /**
+   * 当前最终得分。
+   */
+  finalScore: number
+
+  /**
+   * 当前已提交评分人数。
+   */
+  ratingCount: number
+
+  /**
+   * 最后一次评分提交时间。
+   */
   updateTime: string | null
 }
 
 /**
  * 评委类型。
+ *
+ * 0 = 大众评委
+ * 1 = 专家评委
  */
 export type ReviewerType = 0 | 1
 
@@ -55,7 +90,16 @@ export interface QueryRatingResultParams {
   pageSize: number
 
   itemName?: string
+
   reviewerType?: ReviewerType
+
+  /**
+   * 专家：
+   * 0 ~ 100
+   *
+   * 大众：
+   * 1 或 2
+   */
   score?: number
 }
 
@@ -73,6 +117,13 @@ export interface RatingResultItem {
 
   reviewerType: ReviewerType
 
+  /**
+   * reviewerType = 1：
+   * 0 ~ 100 专家评分。
+   *
+   * reviewerType = 0：
+   * 1 或 2 个赞。
+   */
   score: number
 
   createTime: string

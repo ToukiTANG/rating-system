@@ -1,17 +1,15 @@
 from hmac import compare_digest
-from secrets import token_urlsafe
 
 from sqlalchemy import func, select, case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
-from app.models import RatingResultModel
+from app.models import RatingResultModel, RatingTopicModel, RatingItemParticipantModel
 from app.models.rating_item import RatingItemModel
 from app.models.rating_result import ReviewerType
 from app.schemas.rating import (
     CreateRatingItemRequest,
-    PageResult,
     RatingItemResponse,
     RatingStatus,
     UpdateRatingItemRequest,
@@ -21,7 +19,7 @@ from app.schemas.rating import (
     RatingResultResponse,
     RatingStatusResponse, RatingResultListItemResponse
 )
-
+from app.schemas.common import PageResult
 
 class RatingService:
     """
@@ -35,6 +33,7 @@ class RatingService:
     def list_items(
             self,
             *,
+            topic_id: int | None,
             name: str | None,
             status: RatingStatus | None,
             page: int,
@@ -49,6 +48,10 @@ class RatingService:
         # -------------------------
 
         conditions = []
+        if topic_id is not None:
+            conditions.append(
+                RatingItemModel.topic_id == topic_id
+            )
 
         if name:
             keyword = name.strip()
@@ -132,7 +135,25 @@ class RatingService:
     ) -> RatingItemResponse:
         """
         创建评分项目。
+
+        新评分项目必须归属于一个评分主题。
         """
+
+        # -------------------------
+        # 查询所属评分主题
+        # -------------------------
+
+        topic = self.db.get(
+            RatingTopicModel,
+            request.topic_id,
+        )
+
+        if topic is None:
+            raise BusinessException(
+                code=10013,
+                message="评分主题不存在",
+                status_code=404,
+            )
 
         # -------------------------
         # 检查名称是否已经存在
@@ -141,7 +162,9 @@ class RatingService:
         exists_stmt = (
             select(RatingItemModel.id)
             .where(
-                RatingItemModel.name == request.name
+                # 同一个评分主题内名称不能重复。
+                RatingItemModel.topic_id == topic.id,
+                RatingItemModel.name == request.name,
             )
             .limit(1)
         )
@@ -153,7 +176,7 @@ class RatingService:
         if exists_id is not None:
             raise BusinessException(
                 code=10001,
-                message="评分项目名称已存在",
+                message="当前评分主题下评分项目名称已存在",
                 status_code=409,
             )
 
@@ -161,18 +184,11 @@ class RatingService:
         # 创建 ORM 对象
         # -------------------------
 
-        expert_token = (
-            token_urlsafe(24)
-            if request.distinguish_expert
-            else None
-        )
-
         item = RatingItemModel(
+            topic_id=topic.id,
             name=request.name,
             description=request.description,
-            distinguish_expert=request.distinguish_expert,
-            expert_weight=request.expert_weight,
-            expert_token=expert_token,
+
             # 新增项目固定为初始化状态。
             status=int(
                 RatingStatus.INITIALIZED
@@ -182,25 +198,19 @@ class RatingService:
         self.db.add(item)
 
         try:
-            # 提交事务。
             self.db.commit()
 
+
         except IntegrityError:
-            # 数据库约束异常必须 rollback，
-            # 否则当前 Session 会保持失败状态。
+
             self.db.rollback()
 
-            # 即使前面已经检查名称是否重复，
-            # 高并发情况下仍可能在检查后被其他事务插入。
-            # 因此数据库 UNIQUE 约束仍然是最终保障。
             raise BusinessException(
                 code=10001,
-                message="评分项目名称已存在",
+                message="当前评分主题下评分项目名称已存在",
                 status_code=409,
             )
 
-        # 重新读取数据库生成的字段：
-        # id、create_time、update_time 等。
         self.db.refresh(item)
 
         return RatingItemResponse.model_validate(
@@ -242,6 +252,8 @@ class RatingService:
         duplicate_stmt = (
             select(RatingItemModel.id)
             .where(
+                # 只检查当前评分主题中的同名项目。
+                RatingItemModel.topic_id == item.topic_id,
                 RatingItemModel.name == request.name,
 
                 # 排除当前正在修改的记录。
@@ -257,7 +269,7 @@ class RatingService:
         if duplicate_id is not None:
             raise BusinessException(
                 code=10001,
-                message="评分项目名称已存在",
+                message="当前评分主题下评分项目名称已存在",
                 status_code=409,
             )
 
@@ -267,29 +279,19 @@ class RatingService:
 
         item.name = request.name
         item.description = request.description
-        item.distinguish_expert = request.distinguish_expert
-        item.expert_weight = request.expert_weight
-
-        if request.distinguish_expert:
-            # 原来没有开启专家评分，现在开启时才创建Token。
-            if not item.expert_token:
-                item.expert_token = token_urlsafe(24)
-        else:
-            # 关闭专家评分时是否清除Token，可以按业务选择。
-            item.expert_token = None
         # status 属于系统状态，
         # 普通修改接口不允许直接修改。
         try:
             self.db.commit()
 
+
         except IntegrityError:
-            # 数据库操作失败后必须回滚，
-            # 否则 Session 会保持失败状态。
+
             self.db.rollback()
 
             raise BusinessException(
                 code=10001,
-                message="评分项目名称已存在",
+                message="当前评分主题下评分项目名称已存在",
                 status_code=409,
             )
 
@@ -383,7 +385,14 @@ class RatingService:
             0（初始化）
         修改为：
             1（评分中）
+
+        同一个评分主题下，
+        同一时刻只能有一个评分项目处于评分中。
         """
+
+        # -------------------------
+        # 查询评分项目
+        # -------------------------
 
         item = self.db.get(
             RatingItemModel,
@@ -397,7 +406,21 @@ class RatingService:
                 status_code=404,
             )
 
-        # 只有初始化状态允许开始评分。
+        # -------------------------
+        # 必须已经关联评分主题
+        # -------------------------
+
+        if item.topic_id is None:
+            raise BusinessException(
+                code=10011,
+                message="评分项目未关联评分主题",
+                status_code=409,
+            )
+
+        # -------------------------
+        # 检查当前项目状态
+        # -------------------------
+
         if item.status != int(
                 RatingStatus.INITIALIZED
         ):
@@ -407,12 +430,67 @@ class RatingService:
                 status_code=409,
             )
 
-        # 更新评分状态。
+        # -------------------------
+        # 检查同一主题是否已有
+        # 正在评分的项目
+        # -------------------------
+
+        active_item_stmt = (
+            select(RatingItemModel.id)
+            .where(
+                RatingItemModel.topic_id
+                == item.topic_id,
+
+                RatingItemModel.status
+                == int(RatingStatus.RATING),
+
+                # 正常情况下当前 item 还是初始化状态，
+                # 这里仍然排除自己，使查询语义更明确。
+                RatingItemModel.id
+                != item.id,
+            )
+            .limit(1)
+        )
+
+        active_item_id = self.db.scalar(
+            active_item_stmt
+        )
+
+        if active_item_id is not None:
+            raise BusinessException(
+                code=10012,
+                message="当前评分主题已有正在评分的项目",
+                status_code=409,
+            )
+
+        # -------------------------
+        # 开始评分
+        # -------------------------
+
         item.status = int(
             RatingStatus.RATING
         )
 
-        self.db.commit()
+        try:
+            self.db.commit()
+
+        except IntegrityError:
+            # 即使上面已经提前查询，
+            # 两个请求并发开始评分时仍然可能：
+            #
+            # 请求 A：查询 -> 没有活动项目
+            # 请求 B：查询 -> 没有活动项目
+            # 请求 A：提交成功
+            # 请求 B：提交时触发唯一索引
+            #
+            # 因此数据库约束仍然作为最终保障。
+            self.db.rollback()
+
+            raise BusinessException(
+                code=10012,
+                message="当前评分主题已有正在评分的项目",
+                status_code=409,
+            )
 
         # 获取数据库最新值，
         # 包括 update_time。
@@ -480,9 +558,15 @@ class RatingService:
 
         同一个浏览器客户端，对同一个评分项目
         只能成功提交一次评分。
+
+        评分前必须已经取得当前 RatingTopic
+        对应评委类型的参与资格。
         """
 
-        # 查询评分项目。
+        # -------------------------
+        # 查询评分项目
+        # -------------------------
+
         item = self.db.get(
             RatingItemModel,
             request.rating_item_id,
@@ -495,7 +579,33 @@ class RatingService:
                 status_code=404,
             )
 
-        # 只有评分中状态允许提交评分。
+        # -------------------------
+        # 检查评分项目所属主题
+        # -------------------------
+
+        if item.topic_id is None:
+            raise BusinessException(
+                code=10011,
+                message="评分项目未关联评分主题",
+                status_code=409,
+            )
+
+        topic = self.db.get(
+            RatingTopicModel,
+            item.topic_id,
+        )
+
+        if topic is None:
+            raise BusinessException(
+                code=10013,
+                message="评分主题不存在",
+                status_code=404,
+            )
+
+        # -------------------------
+        # 检查评分状态
+        # -------------------------
+
         if item.status != int(
                 RatingStatus.RATING
         ):
@@ -505,24 +615,28 @@ class RatingService:
                 status_code=409,
             )
 
-        # 默认是大众评分。
+        # -------------------------
+        # 判断本次请求的评委类型
+        # -------------------------
+
         reviewer_type = ReviewerType.PUBLIC
 
-        # URL 携带 expertToken，
-        # 说明用户试图通过专家入口评分。
+        # 携带 expertToken，
+        # 表示本次请求试图以专家身份评分。
         if request.expert_token is not None:
-            if not item.distinguish_expert:
+
+            if not topic.distinguish_expert:
                 raise BusinessException(
                     code=10008,
-                    message="当前项目未开启专家评分",
+                    message="当前评分主题未开启专家评分",
                     status_code=403,
                 )
 
             if (
-                    item.expert_token is None
+                    topic.expert_token is None
                     or not compare_digest(
                 request.expert_token,
-                item.expert_token,
+                topic.expert_token,
             )
             ):
                 raise BusinessException(
@@ -533,8 +647,76 @@ class RatingService:
 
             reviewer_type = ReviewerType.EXPERT
 
+        # -------------------------
+        # 校验 Topic 评分资格
+        # -------------------------
+
+        participant_stmt = (
+            select(
+                RatingItemParticipantModel
+            )
+            .where(
+                RatingItemParticipantModel.rating_item_id
+                == item.id,
+
+                RatingItemParticipantModel.client_id
+                == request.client_id,
+            )
+            .limit(1)
+        )
+
+        participant = self.db.scalar(
+            participant_stmt
+        )
+
+        # 没有经过 Topic 入口取得评分资格。
+        if participant is None:
+            raise BusinessException(
+                code=10014,
+                message="当前客户端没有该评分主题的评分资格",
+                status_code=403,
+            )
+
+        # 已取得资格，但身份与当前入口不一致。
+        if (
+                participant.reviewer_type
+                != int(reviewer_type)
+        ):
+            raise BusinessException(
+                code=10015,
+                message="当前评分身份与已登记评委身份不一致",
+                status_code=403,
+            )
+
+        # -------------------------
+        # 校验评分值
+        # -------------------------
+
+        if reviewer_type == ReviewerType.EXPERT:
+            # 专家使用 0 ~ 100 分制。
+            if request.score < 0 or request.score > 100:
+                raise BusinessException(
+                    code=10016,
+                    message="专家评分必须在 0 到 100 分之间",
+                    status_code=422,
+                )
+
+        else:
+            # 大众不使用分数制，
+            # 只能提交 1 个赞或 2 个赞。
+            if request.score not in (1, 2):
+                raise BusinessException(
+                    code=10017,
+                    message="大众评分只能选择 1 个赞或 2 个赞",
+                    status_code=422,
+                )
+
+        # -------------------------
+        # 保存评分结果
+        # -------------------------
+
         result = RatingResultModel(
-            rating_item_id=request.rating_item_id,
+            rating_item_id=item.id,
             client_id=request.client_id,
             reviewer_type=int(reviewer_type),
             score=request.score,
@@ -548,6 +730,12 @@ class RatingService:
         except IntegrityError:
             self.db.rollback()
 
+            # rating_result 当前已有：
+            #
+            # UNIQUE(rating_item_id, client_id)
+            #
+            # 因此同一个客户端对同一个 Item
+            # 最多只能成功提交一次。
             raise BusinessException(
                 code=10007,
                 message="您已经提交过评分",
@@ -610,7 +798,35 @@ class RatingService:
     ) -> RatingStatisticsResponse:
         """
         获取评分项目实时统计结果。
+
+        评分规则：
+
+        1. 不区分专家评委：
+           最终得分 = 大众点赞总数
+
+        2. 区分专家评委：
+           最终得分 =
+               专家平均分 × 专家权重
+               +
+               大众点赞总数 × 大众权重
+
+           其中：
+               大众权重 = 1 - 专家权重
+
+        3. 专家评分范围：
+           0 ~ 100 分
+
+        4. 大众评分：
+           每人只能提交 1 个赞或 2 个赞
+
+        最终得分不限制在 100 分以内，
+        由 RatingTopic 配置的专家/大众参与人数上限
+        控制最终评分规模。
         """
+
+        # -------------------------
+        # 查询评分项目
+        # -------------------------
 
         item = self.db.get(
             RatingItemModel,
@@ -624,17 +840,59 @@ class RatingService:
                 status_code=404,
             )
 
-        # 不区分专家评委时，
-        # 直接计算所有评分的平均分。
-        if not item.distinguish_expert:
+        # -------------------------
+        # 检查评分项目所属主题
+        # -------------------------
+
+        if item.topic_id is None:
+            raise BusinessException(
+                code=10011,
+                message="评分项目未关联评分主题",
+                status_code=409,
+            )
+
+        topic = self.db.get(
+            RatingTopicModel,
+            item.topic_id,
+        )
+
+        if topic is None:
+            raise BusinessException(
+                code=10013,
+                message="评分主题不存在",
+                status_code=404,
+            )
+
+        # -------------------------
+        # 不区分专家评委
+        # -------------------------
+        #
+        # 此时全部为大众评分。
+        #
+        # 大众每人提交：
+        # 1 个赞 或 2 个赞。
+        #
+        # 大众权重为 100%，
+        # 因此最终得分就是点赞总数。
+        # -------------------------
+
+        if not topic.distinguish_expert:
             stmt = (
                 select(
-                    func.avg(
-                        RatingResultModel.score
+                    # 大众点赞总数。
+                    func.coalesce(
+                        func.sum(
+                            RatingResultModel.score
+                        ),
+                        0.0,
                     ),
+
+                    # 总评分人数。
                     func.count(
                         RatingResultModel.id
                     ),
+
+                    # 最后一次评分时间。
                     func.max(
                         RatingResultModel.create_time
                     ),
@@ -645,42 +903,57 @@ class RatingService:
                 )
             )
 
-            average_score, rating_count, update_time = (
-                self.db.execute(stmt).one()
+            (
+                public_like_count,
+                rating_count,
+                update_time,
+            ) = self.db.execute(
+                stmt
+            ).one()
+
+            final_score = float(
+                public_like_count
             )
 
             return RatingStatisticsResponse(
-                averageScore=(
-                    round(
-                        float(average_score),
-                        2,
-                    )
-                    if average_score is not None
-                    else None
+                finalScore=round(
+                    final_score,
+                    2,
                 ),
                 ratingCount=rating_count,
                 updateTime=update_time,
             )
 
-        # 开启专家评分时，
-        # expert_weight 必须存在。
-        if item.expert_weight is None:
+        # -------------------------
+        # 区分专家评委
+        # -------------------------
+
+        if topic.expert_weight is None:
             raise BusinessException(
                 code=10010,
-                message="评分项目专家权重配置异常",
+                message="评分主题专家权重配置异常",
                 status_code=500,
             )
 
         stmt = (
             select(
-                # 专家平均分。
-                # 当前没有专家评分时按 0 处理。
+                # -------------------------
+                # 专家平均分
+                # -------------------------
+                #
+                # 专家评分：
+                # 0 ~ 100 分。
+                #
+                # 当前没有专家评分时，
+                # 专家平均分按 0 处理。
                 func.coalesce(
                     func.avg(
                         case(
                             (
                                 RatingResultModel.reviewer_type
-                                == int(ReviewerType.EXPERT),
+                                == int(
+                                    ReviewerType.EXPERT
+                                ),
                                 RatingResultModel.score,
                             ),
                             else_=None,
@@ -689,28 +962,43 @@ class RatingService:
                     0.0,
                 ),
 
-                # 大众平均分。
-                # 当前没有大众评分时按 0 处理。
+                # -------------------------
+                # 大众点赞总数
+                # -------------------------
+                #
+                # 大众每人只能提交：
+                # 1 个赞 或 2 个赞。
+                #
+                # 注意这里使用 SUM，
+                # 不再计算大众平均分。
                 func.coalesce(
-                    func.avg(
+                    func.sum(
                         case(
                             (
                                 RatingResultModel.reviewer_type
-                                == int(ReviewerType.PUBLIC),
+                                == int(
+                                    ReviewerType.PUBLIC
+                                ),
                                 RatingResultModel.score,
                             ),
-                            else_=None,
+                            else_=0,
                         )
                     ),
                     0.0,
                 ),
 
-                # 总评分人数。
+                # -------------------------
+                # 总提交人数
+                # -------------------------
+
                 func.count(
                     RatingResultModel.id
                 ),
 
-                # 最后一次评分时间。
+                # -------------------------
+                # 最后一次评分时间
+                # -------------------------
+
                 func.max(
                     RatingResultModel.create_time
                 ),
@@ -723,30 +1011,58 @@ class RatingService:
 
         (
             expert_average,
-            public_average,
+            public_like_count,
             rating_count,
             update_time,
-        ) = self.db.execute(stmt).one()
+        ) = self.db.execute(
+            stmt
+        ).one()
+
+        # -------------------------
+        # 计算专家 / 大众权重
+        # -------------------------
 
         expert_weight = float(
-            item.expert_weight
+            topic.expert_weight
         )
 
         public_weight = (
                 1 - expert_weight
         )
 
-        # 根据专家和大众权重计算实时最终分。
-        average_score = (
+        # -------------------------
+        # 计算最终得分
+        # -------------------------
+        #
+        # 例如：
+        #
+        # 专家权重 = 0.6
+        # 专家平均分 = 80
+        #
+        # 大众：
+        # 1 + 2 + 2 = 5 个赞
+        #
+        # 专家贡献：
+        # 80 × 0.6 = 48
+        #
+        # 大众贡献：
+        # 5 × 0.4 = 2
+        #
+        # 最终得分：
+        # 48 + 2 = 50
+        # -------------------------
+
+        final_score = (
                 float(expert_average)
                 * expert_weight
-                + float(public_average)
+                +
+                float(public_like_count)
                 * public_weight
         )
 
         return RatingStatisticsResponse(
-            averageScore=round(
-                average_score,
+            finalScore=round(
+                final_score,
                 2,
             ),
             ratingCount=rating_count,

@@ -6,7 +6,6 @@ from app.database.session import SessionDep
 from app.schemas.common import ApiResponse
 from app.schemas.rating import (
     CreateRatingItemRequest,
-    PageResult,
     RatingItemResponse,
     RatingStatus,
     UpdateRatingItemRequest,
@@ -18,6 +17,7 @@ from app.schemas.rating import (
     RatingStatusResponse, RatingResultListItemResponse
 )
 from app.services.rating_service import RatingService
+from app.schemas.common import PageResult
 
 router = APIRouter(
     prefix="/rating",
@@ -33,6 +33,15 @@ router = APIRouter(
 )
 def get_rating_item_list(
         db: SessionDep,
+
+        topic_id: Annotated[
+            int | None,
+            Query(
+                alias="topicId",
+                ge=1,
+                description="评分主题 ID",
+            ),
+        ] = None,
 
         name: Annotated[
             str | None,
@@ -77,6 +86,7 @@ def get_rating_item_list(
     service = RatingService(db)
 
     result = service.list_items(
+        topic_id=topic_id,
         name=name,
         status=status_,
         page=page,
@@ -367,8 +377,8 @@ def query_results(
         ),
         score: float | None = Query(
             default=None,
-            ge=1,
-            le=5,
+            ge=0,
+            le=100,
         ),
 ):
     """
