@@ -63,6 +63,23 @@
         <el-table-column prop="name" label="项目名称" min-width="150" show-overflow-tooltip />
 
         <el-table-column prop="description" label="项目描述" min-width="260" show-overflow-tooltip />
+        <!-- 项目图片 -->
+        <el-table-column label="项目图片" width="110" align="center">
+          <template #default="{ row }">
+            <el-image
+              v-if="row.imageUrl"
+              :src="row.imageUrl"
+              :preview-src-list="[row.imageUrl]"
+              fit="cover"
+              class="item-thumbnail"
+              preview-teleported
+              hide-on-click-modal
+            />
+
+            <!-- 兼容历史无图片数据 -->
+            <span v-else class="image-empty-text"> -- </span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
@@ -504,5 +521,29 @@ onMounted(() => {
   justify-content: flex-end;
 
   padding-top: 16px;
+}
+
+/* =========================
+   项目图片
+========================= */
+
+.item-thumbnail {
+  width: 72px;
+  height: 54px;
+
+  display: block;
+
+  margin: 0 auto;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+
+  cursor: pointer;
+}
+
+.image-empty-text {
+  color: #909399;
+
+  font-size: 13px;
 }
 </style>

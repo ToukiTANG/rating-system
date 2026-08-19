@@ -188,6 +188,7 @@ class RatingService:
             topic_id=topic.id,
             name=request.name,
             description=request.description,
+            image_url=request.image_url,
 
             # 新增项目固定为初始化状态。
             status=int(
@@ -277,6 +278,8 @@ class RatingService:
         # 更新允许编辑的字段
         # -------------------------
 
+        if request.image_url is not None:
+            item.image_url = request.image_url
         item.name = request.name
         item.description = request.description
         # status 属于系统状态，

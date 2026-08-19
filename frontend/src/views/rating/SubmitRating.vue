@@ -69,6 +69,19 @@
 
         <!-- 当前存在正在评分的 Item -->
         <template v-else-if="ratingItem">
+          <!-- =========================
+         项目图片
+    ========================== -->
+          <div v-if="ratingItem.imageUrl" class="rating-item-image-wrapper">
+            <el-image
+              :src="ratingItem.imageUrl"
+              :preview-src-list="[ratingItem.imageUrl]"
+              fit="contain"
+              class="rating-item-image"
+              preview-teleported
+              hide-on-click-modal
+            />
+          </div>
           <!-- 已经提交 -->
           <template v-if="submitted">
             <div class="submitted-icon">
@@ -773,6 +786,37 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
+/* =========================
+   评分项目图片
+========================= */
+
+.rating-item-image-wrapper {
+  width: 100%;
+  max-width: 360px;
+
+  margin-bottom: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rating-item-image {
+  width: 100%;
+  max-height: 240px;
+
+  display: block;
+
+  overflow: hidden;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+
+  background: #f5f7fa;
+
+  cursor: pointer;
+}
+
 .score-title {
   color: #303133;
 
@@ -786,10 +830,6 @@ onMounted(() => {
   color: #909399;
 
   font-size: 14px;
-}
-
-.score-rate {
-  margin-top: 44px;
 }
 
 .score-value {
@@ -985,5 +1025,29 @@ onMounted(() => {
 .submitted-score-value strong {
   color: #303133;
   font-size: 20px;
+}
+
+@media (max-width: 600px) {
+  .rating-content {
+    align-items: flex-start;
+
+    padding: 16px;
+  }
+
+  .score-panel {
+    min-height: auto;
+
+    padding: 32px 20px;
+  }
+
+  .rating-item-image-wrapper {
+    max-width: 100%;
+
+    margin-bottom: 28px;
+  }
+
+  .rating-item-image {
+    max-height: 220px;
+  }
 }
 </style>

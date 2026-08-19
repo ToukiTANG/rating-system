@@ -21,6 +21,13 @@ export interface RatingItem {
 
   description: string
 
+  /**
+   * 项目图片 CDN 地址。
+   *
+   * 历史项目可能没有图片。
+   */
+  imageUrl: string | null
+
   status: RatingStatus
 
   createTime: string
@@ -43,6 +50,10 @@ export interface AddRatingItemRequest {
   topicId: number
   name: string
   description: string
+  /**
+   * 新增 RatingItem 时图片必填。
+   */
+  imageUrl: string
 }
 
 /**

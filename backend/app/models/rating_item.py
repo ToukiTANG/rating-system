@@ -95,6 +95,11 @@ class RatingItemModel(Base):
         default="",
     )
 
+    image_url: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+
     # 项目状态：
     #
     # 0：初始化

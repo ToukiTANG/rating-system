@@ -147,3 +147,34 @@ export function submitScore(data: SubmitScoreRequest) {
 export function queryRatingResults(params: QueryRatingResultParams): Promise<PageResult<RatingResultItem>> {
   return get<PageResult<RatingResultItem>>('/rating/queryResults', params)
 }
+
+/**
+ * RatingItem 图片上传结果。
+ */
+export interface UploadItemImageResponse {
+  url: string
+}
+
+/**
+ * 上传 RatingItem 图片。
+ *
+ * 文件上传使用 multipart/form-data，
+ * 不能使用普通 JSON post() 封装。
+ */
+/**
+ * 上传 RatingItem 图片。
+ */
+export interface UploadItemImageResponse {
+  url: string
+}
+
+/**
+ * 上传 RatingItem 图片。
+ */
+export function uploadItemImage(file: File): Promise<UploadItemImageResponse> {
+  const formData = new FormData()
+
+  formData.append('file', file, file.name)
+
+  return post<UploadItemImageResponse>('/rating/uploadItemImage', formData)
+}

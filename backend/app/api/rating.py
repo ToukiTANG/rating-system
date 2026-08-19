@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, status, UploadFile, File
 
 from app.database.session import SessionDep
 from app.schemas.common import ApiResponse
+from app.schemas.common import PageResult
 from app.schemas.rating import (
     CreateRatingItemRequest,
     RatingItemResponse,
@@ -14,10 +15,10 @@ from app.schemas.rating import (
     RatingStatisticsResponse,
     RatingResultResponse,
     SubmitScoreRequest,
-    RatingStatusResponse, RatingResultListItemResponse
+    RatingStatusResponse, RatingResultListItemResponse, UploadItemImageResponse
 )
 from app.services.rating_service import RatingService
-from app.schemas.common import PageResult
+from app.services.upyun_service import UpyunService
 
 router = APIRouter(
     prefix="/rating",
@@ -401,4 +402,30 @@ def query_results(
 
     return ApiResponse(
         data=result,
+    )
+
+
+@router.post(
+    "/uploadItemImage",
+    response_model=ApiResponse[
+        UploadItemImageResponse
+    ],
+)
+async def upload_item_image(
+        file: UploadFile = File(...),
+):
+    """
+    上传 RatingItem 图片到又拍云。
+    """
+
+    service = UpyunService()
+
+    url = await service.upload_item_image(
+        file
+    )
+
+    return ApiResponse(
+        data=UploadItemImageResponse(
+            url=url,
+        ),
     )

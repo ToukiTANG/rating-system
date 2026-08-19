@@ -16,20 +16,37 @@
             返回评分项目
           </el-button>
 
-          <!-- 项目名称和当前状态 -->
-          <div class="title-row">
-            <h1 class="rating-title">
-              {{ ratingItem?.name || '评分项目' }}
-            </h1>
+          <!-- 项目信息 -->
+          <div class="item-overview">
+            <!-- 项目图片 -->
+            <el-image
+              v-if="ratingItem?.imageUrl"
+              :src="ratingItem.imageUrl"
+              :preview-src-list="[ratingItem.imageUrl]"
+              fit="cover"
+              class="item-image"
+              preview-teleported
+              hide-on-click-modal
+            />
 
-            <el-tag v-if="ratingItem" :type="statusInfo.type" size="large">
-              {{ statusInfo.label }}
-            </el-tag>
-          </div>
+            <!-- 项目文字信息 -->
+            <div class="item-info">
+              <!-- 项目名称和当前状态 -->
+              <div class="title-row">
+                <h1 class="rating-title">
+                  {{ ratingItem?.name || '评分项目' }}
+                </h1>
 
-          <!-- 项目描述 -->
-          <div class="description">
-            {{ ratingItem?.description || '-' }}
+                <el-tag v-if="ratingItem" :type="statusInfo.type" size="large">
+                  {{ statusInfo.label }}
+                </el-tag>
+              </div>
+
+              <!-- 项目描述 -->
+              <div class="description">
+                {{ ratingItem?.description || '-' }}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -59,7 +76,7 @@
     <main v-loading="loading" class="rating-content">
       <!-- 实时平均分 -->
       <section class="score-panel">
-        <div class="score-title">实时平均分</div>
+        <div class="score-title">实时得分</div>
 
         <!-- 当前平均分 -->
         <div class="score-content">
@@ -500,6 +517,43 @@ onBeforeUnmount(() => {
   margin-bottom: 16px;
 
   padding-left: 0;
+}
+
+/* =========================
+   项目信息
+========================= */
+
+.item-overview {
+  display: flex;
+  align-items: center;
+
+  gap: 20px;
+
+  min-width: 0;
+}
+
+.item-image {
+  width: 140px;
+  height: 105px;
+
+  flex-shrink: 0;
+
+  display: block;
+
+  overflow: hidden;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+
+  background: #f5f7fa;
+
+  cursor: pointer;
+}
+
+.item-info {
+  flex: 1;
+
+  min-width: 0;
 }
 
 .title-row {

@@ -292,6 +292,12 @@ class CreateRatingItemRequest(BaseModel):
         description="项目描述",
     )
 
+    image_url: str = Field(
+        alias="imageUrl",
+        min_length=1,
+        max_length=500,
+    )
+
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str) -> str:
@@ -337,6 +343,11 @@ class RatingItemResponse(BaseModel):
 
     description: str
 
+    image_url: str | None = Field(
+        default=None,
+        alias="imageUrl",
+    )
+
     status: RatingStatus
 
     create_time: datetime = Field(
@@ -371,6 +382,13 @@ class UpdateRatingItemRequest(BaseModel):
         default="",
         max_length=500,
         description="项目描述",
+    )
+
+    image_url: str | None = Field(
+        default=None,
+        alias="imageUrl",
+        min_length=1,
+        max_length=500,
     )
 
     @field_validator("name")
@@ -664,3 +682,12 @@ class RatingTopicEntryResponse(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
+
+class UploadItemImageResponse(
+    BaseModel
+):
+    """
+    RatingItem 图片上传响应。
+    """
+
+    url: str
