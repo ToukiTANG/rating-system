@@ -26,7 +26,13 @@
       <div class="table-wrapper">
         <el-table v-loading="loading" :data="topicList" stripe height="100%" border>
           <el-table-column type="index" label="序号" width="70" align="center" />
-          <el-table-column prop="name" label="主题名称" min-width="160" />
+          <el-table-column label="主题名称" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">
+              <el-link type="primary" :underline="false" @click="handleOpenRatingItems(row)">
+                {{ row.name }}
+              </el-link>
+            </template>
+          </el-table-column>
 
           <el-table-column prop="description" label="描述" min-width="220" show-overflow-tooltip />
 
@@ -90,6 +96,7 @@ import { deleteRatingTopic, queryRatingTopic } from '@/api/rating/RatingTopic.ts
 import type { RatingTopic, RatingTopicQueryParams } from '@/types'
 import AddOrUpdate from '@/views/rating/topic/AddOrUpdate.vue'
 import QrCodeDialog from '@/views/rating/topic/QrCodeDialog.vue'
+import { useRouter } from 'vue-router'
 
 const loading = ref(false)
 
@@ -102,6 +109,8 @@ const addOrUpdateRef = ref<InstanceType<typeof AddOrUpdate>>()
 const qrCodeDialogVisible = ref(false)
 
 const qrCodeTopic = ref<RatingTopic | null>(null)
+
+const router = useRouter()
 
 const queryParams = reactive<
   Required<Pick<RatingTopicQueryParams, 'page' | 'pageSize'>> & {
@@ -154,6 +163,21 @@ function handlePageSizeChange(pageSize: number) {
   queryParams.page = 1
 
   loadData()
+}
+
+/**
+ * 跳转到当前主题对应的评分项目列表。
+ *
+ * 通过 query 传递 topicId，
+ * RatingItem 页面根据 topicId 自动筛选。
+ */
+function handleOpenRatingItems(row: RatingTopic) {
+  router.push({
+    path: '/RatingItem',
+    query: {
+      topicId: row.id.toString(),
+    },
+  })
 }
 
 /**

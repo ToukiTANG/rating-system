@@ -112,7 +112,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { Plus } from '@element-plus/icons-vue'
 
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import type { RatingItem, SearchForm, RatingTopic } from '@/types'
 
@@ -155,6 +155,7 @@ const dialogVisible = ref(false)
 const loading = ref(false)
 
 const router = useRouter()
+const route = useRoute()
 
 /**
  * Topic 列表。
@@ -211,6 +212,25 @@ function getTopicName(topicId: number | null): string {
 }
 
 /**
+ * 从 URL query 中读取评分主题 ID。
+ */
+function loadTopicIdFromRoute() {
+  const value = route.query.topicId
+
+  if (typeof value !== 'string') {
+    return
+  }
+
+  const topicId = Number(value)
+
+  if (!Number.isInteger(topicId) || topicId <= 0) {
+    return
+  }
+
+  searchForm.topicId = topicId
+}
+
+/**
  * 加载 Topic。
  *
  * 当前主要用于筛选和显示 Topic 名称。
@@ -236,14 +256,20 @@ function handleSearch() {
 /**
  * 重置查询条件。
  */
-function handleReset() {
+async function handleReset() {
   searchForm.topicId = null
   searchForm.name = ''
   searchForm.status = null
 
   pagination.page = 1
-
-  loadData()
+  /**
+   * 清除 URL 中从 Topic 页面带过来的筛选条件。
+   */
+  await router.replace({
+    path: route.path,
+    query: {},
+  })
+  await loadData()
 }
 
 /**
@@ -368,10 +394,12 @@ function handlePageChange(page: number) {
   loadData()
 }
 
-onMounted(async () => {
-  await loadTopics()
+onMounted(() => {
+  loadTopicIdFromRoute()
 
-  await loadData()
+  loadTopics()
+
+  loadData()
 })
 </script>
 
