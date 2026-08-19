@@ -454,15 +454,25 @@ class RatingTopicService:
         流程：
 
         1. 查询 Topic
-        2. 判断当前客户端是大众还是专家
+        2. 判断当前客户端的评委身份
         3. 查询当前 status=1 的 RatingItem
         4. 如果没有 active Item，则直接返回
         5. 如果存在 active Item，则申请该 Item 的评分名额
         6. 返回当前 RatingItem
 
         注意：
+
         participant 属于 RatingItem，
         而不是 RatingTopic。
+
+        当 distinguish_expert=False 时：
+        - 所有参与者仍按 PUBLIC 身份记录
+        - 使用 public_limit 控制参与人数
+        - 后续评分方式为 0~100 分制
+
+        当 distinguish_expert=True 时：
+        - PUBLIC 使用点赞评分
+        - EXPERT 使用 0~100 分制
         """
 
         # -------------------------
@@ -484,6 +494,18 @@ class RatingTopicService:
         # -------------------------
         # 判断评委类型
         # -------------------------
+        #
+        # 默认按照 PUBLIC 身份进入。
+        #
+        # 注意：
+        #
+        # distinguish_expert=False 时，
+        # PUBLIC 只是参与者身份，
+        # 不代表使用点赞评分。
+        #
+        # 实际评分方式后续根据
+        # topic.distinguish_expert 决定。
+        # -------------------------
 
         reviewer_type = (
             ReviewerType.PUBLIC
@@ -493,6 +515,8 @@ class RatingTopicService:
         # 表示当前请求希望以专家身份进入。
         if expert_token is not None:
 
+            # Topic 未区分专家 / 大众时，
+            # 不存在专家专用入口。
             if not topic.distinguish_expert:
                 raise BusinessException(
                     code=11004,
@@ -500,6 +524,7 @@ class RatingTopicService:
                     status_code=403,
                 )
 
+            # 校验专家 Token。
             if (
                     topic.expert_token is None
                     or not compare_digest(
@@ -553,10 +578,19 @@ class RatingTopicService:
         if active_item is None:
             return RatingTopicEntryResponse(
                 topicId=topic.id,
+
                 topicName=topic.name,
+
+                # 告诉前端当前 Topic
+                # 是否区分专家 / 大众。
+                distinguishExpert=(
+                    topic.distinguish_expert
+                ),
+
                 reviewerType=int(
                     reviewer_type
                 ),
+
                 activeItem=None,
             )
 
@@ -577,10 +611,19 @@ class RatingTopicService:
 
         return RatingTopicEntryResponse(
             topicId=topic.id,
+
             topicName=topic.name,
+
+            # 告诉前端当前 Topic
+            # 是否区分专家 / 大众。
+            distinguishExpert=(
+                topic.distinguish_expert
+            ),
+
             reviewerType=int(
                 reviewer_type
             ),
+
             activeItem=(
                 TopicActiveRatingItemResponse
                 .model_validate(

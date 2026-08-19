@@ -74,7 +74,6 @@
          页面主体
     ========================== -->
     <main v-loading="loading" class="rating-content">
-      <!-- 实时平均分 -->
       <!-- 实时评分 -->
       <section class="score-panel">
         <!-- =========================
@@ -96,7 +95,8 @@
               <strong>
                 {{ statistics.expertCount }}
               </strong>
-              <span>人</span>
+
+              <span> 人 </span>
             </div>
 
             <div class="reviewer-stat-detail">
@@ -117,15 +117,38 @@
           </div>
 
           <!-- =========================
-               最终实时得分
+               中间核心得分
           ========================== -->
           <div class="final-score">
-            <div class="score-title">实时得分</div>
+            <!--
+              不区分专家：
+              最终得分就是所有评委的平均分。
+
+              区分专家：
+              最终得分是专家和大众加权后的组合结果。
+            -->
+            <div class="score-title">
+              {{ statistics.distinguishExpert ? '实时得分' : '实时平均分' }}
+            </div>
 
             <div class="score-content">
               <span class="score-value">
                 {{ statistics.ratingCount === 0 ? '--' : statistics.finalScore.toFixed(2) }}
               </span>
+            </div>
+
+            <!--
+              不区分专家时没有专家 / 大众之分，
+              直接展示总评分人数。
+            -->
+            <div v-if="!statistics.distinguishExpert && statistics.ratingCount > 0" class="single-rating-count">
+              已评分
+
+              <strong>
+                {{ statistics.ratingCount }}
+              </strong>
+
+              人
             </div>
           </div>
 
@@ -139,7 +162,8 @@
               <strong>
                 {{ statistics.publicCount }}
               </strong>
-              <span>人</span>
+
+              <span> 人 </span>
             </div>
 
             <div class="reviewer-stat-detail">
@@ -1015,6 +1039,27 @@ onBeforeUnmount(() => {
   color: #67c23a;
 
   font-size: 13px;
+}
+
+/* =========================
+   不区分专家时的评分人数
+========================= */
+
+.single-rating-count {
+  margin-top: 28px;
+
+  color: #909399;
+
+  font-size: 14px;
+}
+
+.single-rating-count strong {
+  margin: 0 4px;
+
+  color: #303133;
+
+  font-size: 18px;
+  font-weight: 600;
 }
 
 @keyframes running-pulse {

@@ -671,6 +671,18 @@ class RatingTopicEntryResponse(BaseModel):
         alias="topicName",
     )
 
+    # 当前 Topic 是否区分专家 / 大众评委。
+    #
+    # false：
+    # 所有人统一使用 0~100 分制。
+    #
+    # true：
+    # EXPERT 使用 0~100 分制，
+    # PUBLIC 使用点赞评分。
+    distinguish_expert: bool = Field(
+        alias="distinguishExpert",
+    )
+
     # 0 = 大众评委
     # 1 = 专家评委
     reviewer_type: int = Field(

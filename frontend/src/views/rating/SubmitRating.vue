@@ -16,8 +16,16 @@
               {{ statusInfo.label }}
             </el-tag>
 
-            <el-tag v-if="reviewerType !== null" :type="reviewerType === 1 ? 'warning' : 'info'" size="large">
-              {{ reviewerType === 1 ? '专家评委' : '大众评委' }}
+            <!--
+              Topic 不区分专家时，
+              不再显示“大众评委”，统一显示“评委”。
+            -->
+            <el-tag
+              v-if="reviewerType !== null && distinguishExpert !== null"
+              :type="distinguishExpert && reviewerType === 1 ? 'warning' : 'info'"
+              size="large"
+            >
+              {{ !distinguishExpert ? '评委' : reviewerType === 1 ? '专家评委' : '大众评委' }}
             </el-tag>
           </div>
 
@@ -70,8 +78,8 @@
         <!-- 当前存在正在评分的 Item -->
         <template v-else-if="ratingItem">
           <!-- =========================
-         项目图片
-    ========================== -->
+               项目图片
+          ========================== -->
           <div v-if="ratingItem.imageUrl" class="rating-item-image-wrapper">
             <el-image
               :src="ratingItem.imageUrl"
@@ -82,7 +90,10 @@
               hide-on-click-modal
             />
           </div>
-          <!-- 已经提交 -->
+
+          <!-- =========================
+               已经提交
+          ========================== -->
           <template v-if="submitted">
             <div class="submitted-icon">
               <el-icon>
@@ -95,18 +106,30 @@
             <div class="submitted-description">您已经完成本次评分，无法再次提交。</div>
 
             <div v-if="submittedScore !== null" class="submitted-score">
-              <!-- 专家 -->
-              <template v-if="reviewerType === 1">
+              <!--
+                百分制评分：
+
+                1. Topic 不区分专家；
+                2. Topic 区分专家，当前是专家。
+              -->
+              <template v-if="useScoreMode">
                 <span class="submitted-score-value">
                   您提交的评分：
+
                   <strong>
                     {{ submittedScore }}
                   </strong>
+
                   分
                 </span>
               </template>
 
-              <!-- 大众 -->
+              <!--
+                点赞评分：
+
+                仅 Topic 区分专家，
+                且当前用户为大众评委。
+              -->
               <template v-else>
                 <div class="submitted-like">
                   <div class="submitted-like-icons">
@@ -115,9 +138,11 @@
 
                   <span class="submitted-score-value">
                     您提交了
+
                     <strong>
                       {{ submittedScore }}
                     </strong>
+
                     个赞
                   </span>
                 </div>
@@ -125,15 +150,17 @@
             </div>
           </template>
 
-          <!-- 可以评分 -->
+          <!-- =========================
+               可以评分
+          ========================== -->
           <template v-else>
             <!-- =========================
-                 专家评分
+                 0 ~ 100 分制
             ========================== -->
-            <template v-if="reviewerType === 1">
+            <template v-if="useScoreMode">
               <div class="score-title">请为该项目评分</div>
 
-              <div class="score-description">专家评分采用 0 ～ 100 分制，提交后无法修改。</div>
+              <div class="score-description">评分采用 0 ～ 100 分制，提交后无法修改。</div>
 
               <div class="expert-score">
                 <el-input-number v-model="score" :min="0" :max="100" :step="1" :precision="0" controls-position="right" size="large" />
@@ -144,9 +171,11 @@
               <div class="score-value">
                 <template v-if="score !== null">
                   当前评分：
+
                   <strong>
                     {{ score }}
                   </strong>
+
                   分
                 </template>
 
@@ -155,9 +184,9 @@
             </template>
 
             <!-- =========================
-                 大众评分
+                 大众点赞评分
             ========================== -->
-            <template v-else-if="reviewerType === 0">
+            <template v-else>
               <div class="score-title">请为该项目点赞</div>
 
               <div class="score-description">点击点赞图标进行评分，最多可选择 2 个赞，提交后无法修改。</div>
@@ -182,7 +211,11 @@
               <div class="score-value">
                 <template v-if="score !== null">
                   当前选择：
-                  <strong>{{ score }}</strong>
+
+                  <strong>
+                    {{ score }}
+                  </strong>
+
                   个赞
                 </template>
 
@@ -219,7 +252,9 @@ import type { RatingItem } from '@/types'
 import { getRatingItem, getRatingStatus, submitScore } from '@/api/rating/rating'
 
 import { getClientId } from '@/utils/client'
+
 import { getRatingTopicEntry } from '@/api/rating/RatingTopic.ts'
+
 import LikeIcon from '@/component/LikeIcon.vue'
 
 const route = useRoute()
@@ -227,13 +262,18 @@ const route = useRoute()
 /**
  * 专家评分凭证。
  *
- * 普通大众评分入口：
+ * 普通入口：
  *
  * /score/topic/3
  *
  * 专家评分入口：
  *
  * /score/topic/3?expertToken=xxxx
+ *
+ * 注意：
+ *
+ * 当 Topic 不区分专家时，
+ * 不存在专家入口。
  */
 const expertToken = computed<string | null>(() => {
   const value = route.query.expertToken
@@ -247,17 +287,66 @@ const expertToken = computed<string | null>(() => {
 const ratingItem = ref<RatingItem | null>(null)
 
 /**
- * 当前没有正在评分的项目时的页面提示。
+ * 当前没有正在评分的项目时
+ * 的页面提示。
  */
 const emptyMessage = ref('')
 
 /**
- * 当前评委类型。
+ * 当前 Topic 是否区分
+ * 专家 / 大众评委。
  *
- * 0 = 大众评委
- * 1 = 专家评委
+ * false：
+ * 所有参与者统一使用
+ * 0 ~ 100 分制。
+ *
+ * true：
+ * EXPERT 使用 0 ~ 100 分制；
+ * PUBLIC 使用点赞评分。
+ *
+ * null：
+ * Topic 信息尚未加载。
+ */
+const distinguishExpert = ref<boolean | null>(null)
+
+/**
+ * 当前参与者身份。
+ *
+ * 0 = PUBLIC
+ * 1 = EXPERT
+ *
+ * 注意：
+ *
+ * reviewerType 表示的是参与者身份，
+ * 不直接等价于评分方式。
+ *
+ * 当 distinguishExpert=false 时，
+ * reviewerType 虽然仍然为 PUBLIC，
+ * 但评分方式为 0 ~ 100 分制。
  */
 const reviewerType = ref<0 | 1 | null>(null)
+
+/**
+ * 当前是否使用 0 ~ 100 分制。
+ *
+ * 规则：
+ *
+ * 1. Topic 不区分专家：
+ *    所有人使用 0 ~ 100 分制。
+ *
+ * 2. Topic 区分专家：
+ *    EXPERT 使用 0 ~ 100 分制。
+ *
+ * 3. Topic 区分专家：
+ *    PUBLIC 使用点赞评分。
+ */
+const useScoreMode = computed(() => {
+  if (distinguishExpert.value === null || reviewerType.value === null) {
+    return false
+  }
+
+  return !distinguishExpert.value || reviewerType.value === 1
+})
 
 /**
  * 页面初始化状态。
@@ -272,11 +361,11 @@ const submitting = ref(false)
 /**
  * 当前评分。
  *
- * 专家：
+ * 百分制模式：
  * 0 ~ 100
  *
- * 大众：
- * 1 或 2，表示点赞数量。
+ * 点赞模式：
+ * 1 或 2
  *
  * null：
  * 尚未选择评分。
@@ -286,12 +375,14 @@ const score = ref<number | null>(null)
 /**
  * 大众点赞 hover 状态。
  *
- * 用于实现类似 Rate 组件的预览效果。
+ * 用于实现类似 Rate
+ * 组件的预览效果。
  */
 const hoverLikeScore = ref<number | null>(null)
 
 /**
- * 当前用于 UI 展示的点赞数量。
+ * 当前用于 UI 展示的
+ * 点赞数量。
  *
  * hover 时优先展示 hover 数量，
  * 否则展示已经选择的 score。
@@ -301,7 +392,8 @@ const displayLikeScore = computed(() => {
 })
 
 /**
- * 当前客户端是否已经提交过评分。
+ * 当前客户端是否已经
+ * 提交过评分。
  */
 const submitted = ref(false)
 
@@ -372,21 +464,33 @@ const topicId = computed<number | null>(() => {
  * 当前是否允许提交。
  */
 const canSubmit = computed(() => {
-  if (ratingItem.value?.status !== 1 || submitted.value || reviewerType.value === null || score.value === null) {
+  if (ratingItem.value?.status !== 1 || submitted.value || reviewerType.value === null || distinguishExpert.value === null || score.value === null) {
     return false
   }
 
   /**
-   * 专家：
-   * 0 ~ 100 分。
+   * 百分制评分：
+   *
+   * - Topic 不区分专家；
+   * - 或当前为专家评委。
+   *
+   * 合法范围：
+   * 0 ~ 100。
    */
-  if (reviewerType.value === 1) {
+  if (useScoreMode.value) {
     return score.value >= 0 && score.value <= 100
   }
 
   /**
-   * 大众：
-   * 只能选择 1 个赞或 2 个赞。
+   * 点赞评分：
+   *
+   * 仅：
+   *
+   * distinguishExpert=true
+   * reviewerType=PUBLIC
+   *
+   * 合法值：
+   * 1 或 2。
    */
   return score.value === 1 || score.value === 2
 })
@@ -434,7 +538,8 @@ async function init() {
 }
 
 /**
- * 根据 Topic 获取当前正在评分的 RatingItem。
+ * 根据 Topic 获取当前正在评分的
+ * RatingItem。
  *
  * 流程：
  *
@@ -453,22 +558,41 @@ async function loadCurrentRatingItem() {
 
   if (id === null) {
     ratingItem.value = null
+
     emptyMessage.value = '评分主题 ID 无效'
 
     return
   }
 
   /**
-   * 每次重新进入 Topic 时先清理旧 Item 状态。
+   * 每次重新进入 Topic 时
+   * 先清理旧 Item 状态。
    *
    * 因为 Topic 当前正在评分的 Item
    * 可能已经发生切换。
    */
   ratingItem.value = null
 
-  score.value = 0
+  distinguishExpert.value = null
+
+  reviewerType.value = null
+
+  /**
+   * 注意这里必须使用 null。
+   *
+   * 不能使用：
+   *
+   * score.value = 0
+   *
+   * 因为在百分制评分中，
+   * 0 是一个真实合法评分。
+   */
+  score.value = null
+
+  hoverLikeScore.value = null
 
   submitted.value = false
+
   submittedScore.value = null
 
   emptyMessage.value = ''
@@ -478,15 +602,27 @@ async function loadCurrentRatingItem() {
    *
    * 后端同时会：
    *
-   * 1. 判断大众 / 专家身份
-   * 2. 找到当前 status=1 的 Item
-   * 3. 为当前 Item 申请评分名额
+   * 1. 判断当前参与者身份；
+   * 2. 返回 Topic 是否区分专家；
+   * 3. 找到当前 status=1 的 Item；
+   * 4. 为当前 Item 申请评分名额。
    */
   const entry = await getRatingTopicEntry({
     topicId: id,
+
     clientId: getClientId(),
+
     expertToken: expertToken.value ?? undefined,
   })
+
+  /**
+   * 评分模式需要同时依赖：
+   *
+   * distinguishExpert
+   * +
+   * reviewerType
+   */
+  distinguishExpert.value = entry.distinguishExpert
 
   reviewerType.value = entry.reviewerType
 
@@ -497,9 +633,11 @@ async function loadCurrentRatingItem() {
   }
 
   /**
-   * entry 中只返回当前 active Item 的基础信息。
+   * entry 中只返回当前
+   * active Item 的基础信息。
    *
-   * 当前页面还需要 createTime 等完整字段，
+   * 当前页面还需要
+   * createTime、imageUrl 等完整字段，
    * 因此再查询一次 RatingItem 详情。
    */
   ratingItem.value = await getRatingItem({
@@ -543,7 +681,8 @@ async function handleRefreshStatus() {
 }
 
 /**
- * 查询当前浏览器客户端评分状态。
+ * 查询当前浏览器客户端
+ * 的评分状态。
  */
 async function loadRatingStatus() {
   const item = ratingItem.value
@@ -554,6 +693,7 @@ async function loadRatingStatus() {
 
   const result = await getRatingStatus({
     ratingItemId: item.id,
+
     clientId: getClientId(),
   })
 
@@ -576,16 +716,24 @@ async function handleSubmit() {
     return
   }
 
-  if (score.value === null || reviewerType.value === null) {
+  if (score.value === null || reviewerType.value === null || distinguishExpert.value === null) {
     return
   }
 
-  const confirmMessage = reviewerType.value === 1 ? `确认提交 ${score.value} 分吗？提交后无法修改。` : `确认提交 ${score.value} 个赞吗？提交后无法修改。`
+  /**
+   * 提交确认文案不能再只根据
+   * reviewerType 判断。
+   *
+   * 必须使用最终评分模式。
+   */
+  const confirmMessage = useScoreMode.value ? `确认提交 ${score.value} 分吗？提交后无法修改。` : `确认提交 ${score.value} 个赞吗？提交后无法修改。`
 
   try {
     await ElMessageBox.confirm(confirmMessage, '提交评分', {
       confirmButtonText: '确认提交',
+
       cancelButtonText: '取消',
+
       type: 'warning',
     })
   } catch {
@@ -597,8 +745,11 @@ async function handleSubmit() {
   try {
     await submitScore({
       ratingItemId: item.id,
+
       clientId: getClientId(),
+
       score: score.value,
+
       expertToken: expertToken.value ?? undefined,
     })
 
@@ -606,7 +757,8 @@ async function handleSubmit() {
      * 本地立即切换为已提交状态。
      *
      * 即使用户快速再次点击，
-     * 后端数据库 UNIQUE 约束仍然会兜底。
+     * 后端数据库 UNIQUE 约束
+     * 仍然会兜底。
      */
     submitted.value = true
 

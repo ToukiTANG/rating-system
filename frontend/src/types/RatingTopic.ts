@@ -110,6 +110,7 @@ export interface RatingTopicEntry {
    */
   reviewerType: 0 | 1
 
+  distinguishExpert: boolean
   /**
    * 当前 Topic 没有正在评分的 Item 时为 null。
    */
