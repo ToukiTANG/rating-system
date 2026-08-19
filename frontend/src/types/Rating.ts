@@ -72,19 +72,24 @@ export interface UpdateRatingItemRequest {
  * 实时评分统计。
  */
 export interface RatingStatistics {
-  /**
-   * 当前最终得分。
-   */
   finalScore: number
 
-  /**
-   * 当前已提交评分人数。
-   */
   ratingCount: number
 
-  /**
-   * 最后一次评分提交时间。
-   */
+  distinguishExpert: boolean
+
+  expertCount: number
+
+  expertAverageScore: number | null
+
+  expertWeightedScore: number
+
+  publicCount: number
+
+  publicLikeCount: number
+
+  publicWeightedScore: number
+
   updateTime: string | null
 }
 

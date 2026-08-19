@@ -8,6 +8,7 @@ from app.core.exceptions import BusinessException
 from app.models import RatingResultModel, RatingTopicModel, RatingItemParticipantModel
 from app.models.rating_item import RatingItemModel
 from app.models.rating_result import ReviewerType
+from app.schemas.common import PageResult
 from app.schemas.rating import (
     CreateRatingItemRequest,
     RatingItemResponse,
@@ -19,7 +20,7 @@ from app.schemas.rating import (
     RatingResultResponse,
     RatingStatusResponse, RatingResultListItemResponse
 )
-from app.schemas.common import PageResult
+
 
 class RatingService:
     """
@@ -822,14 +823,22 @@ class RatingService:
         4. 大众评分：
            每人只能提交 1 个赞或 2 个赞
 
+        5. 实时统计同时返回：
+           - 专家评分人数
+           - 专家平均分
+           - 专家加权得分
+           - 大众评分人数
+           - 大众点赞总数
+           - 大众加权得分
+
         最终得分不限制在 100 分以内，
-        由 RatingTopic 配置的专家/大众参与人数上限
+        由 RatingTopic 配置的专家 / 大众参与人数上限
         控制最终评分规模。
         """
 
-        # -------------------------
+        # =========================================================
         # 查询评分项目
-        # -------------------------
+        # =========================================================
 
         item = self.db.get(
             RatingItemModel,
@@ -843,9 +852,9 @@ class RatingService:
                 status_code=404,
             )
 
-        # -------------------------
+        # =========================================================
         # 检查评分项目所属主题
-        # -------------------------
+        # =========================================================
 
         if item.topic_id is None:
             raise BusinessException(
@@ -866,23 +875,25 @@ class RatingService:
                 status_code=404,
             )
 
-        # -------------------------
+        # =========================================================
         # 不区分专家评委
-        # -------------------------
+        # =========================================================
         #
-        # 此时全部为大众评分。
+        # 此时：
         #
-        # 大众每人提交：
-        # 1 个赞 或 2 个赞。
-        #
-        # 大众权重为 100%，
-        # 因此最终得分就是点赞总数。
-        # -------------------------
+        # - 所有评分都是大众评分
+        # - 每人提交 1 或 2 个赞
+        # - 大众权重 = 1
+        # - 最终得分 = 大众点赞总数
+        # =========================================================
 
         if not topic.distinguish_expert:
             stmt = (
                 select(
-                    # 大众点赞总数。
+                    # -------------------------
+                    # 大众点赞总数
+                    # -------------------------
+
                     func.coalesce(
                         func.sum(
                             RatingResultModel.score
@@ -890,12 +901,18 @@ class RatingService:
                         0.0,
                     ),
 
-                    # 总评分人数。
+                    # -------------------------
+                    # 大众评分人数
+                    # -------------------------
+
                     func.count(
                         RatingResultModel.id
                     ),
 
-                    # 最后一次评分时间。
+                    # -------------------------
+                    # 最后一次评分时间
+                    # -------------------------
+
                     func.max(
                         RatingResultModel.create_time
                     ),
@@ -908,14 +925,35 @@ class RatingService:
 
             (
                 public_like_count,
-                rating_count,
+                public_count,
                 update_time,
             ) = self.db.execute(
                 stmt
             ).one()
 
-            final_score = float(
+            # -------------------------
+            # 类型转换
+            # -------------------------
+
+            public_like_count_value = float(
                 public_like_count
+            )
+
+            public_count_value = int(
+                public_count
+            )
+
+            # -------------------------
+            # 不区分专家时
+            # 大众权重固定为 1
+            # -------------------------
+
+            public_weighted_score = (
+                public_like_count_value
+            )
+
+            final_score = (
+                public_weighted_score
             )
 
             return RatingStatisticsResponse(
@@ -923,13 +961,42 @@ class RatingService:
                     final_score,
                     2,
                 ),
-                ratingCount=rating_count,
+
+                ratingCount=public_count_value,
+
+                distinguishExpert=False,
+
+                # -------------------------
+                # 专家统计
+                # -------------------------
+
+                expertCount=0,
+
+                expertAverageScore=None,
+
+                expertWeightedScore=0.0,
+
+                # -------------------------
+                # 大众统计
+                # -------------------------
+
+                publicCount=public_count_value,
+
+                publicLikeCount=int(
+                    public_like_count_value
+                ),
+
+                publicWeightedScore=round(
+                    public_weighted_score,
+                    2,
+                ),
+
                 updateTime=update_time,
             )
 
-        # -------------------------
-        # 区分专家评委
-        # -------------------------
+        # =========================================================
+        # 区分专家 / 大众评委
+        # =========================================================
 
         if topic.expert_weight is None:
             raise BusinessException(
@@ -940,40 +1007,73 @@ class RatingService:
 
         stmt = (
             select(
-                # -------------------------
+                # =================================================
                 # 专家平均分
-                # -------------------------
+                # =================================================
                 #
-                # 专家评分：
-                # 0 ~ 100 分。
+                # 注意：
                 #
-                # 当前没有专家评分时，
-                # 专家平均分按 0 处理。
+                # 这里不使用 COALESCE。
+                #
+                # 如果当前没有专家评分，
+                # AVG 会返回 None。
+                #
+                # 这样前端可以区分：
+                #
+                # None
+                # = 当前没有专家提交评分
+                #
+                # 0
+                # = 有专家真实提交了 0 分
+                # =================================================
+
+                func.avg(
+                    case(
+                        (
+                            RatingResultModel.reviewer_type
+                            == int(
+                                ReviewerType.EXPERT
+                            ),
+                            RatingResultModel.score,
+                        ),
+                        else_=None,
+                    )
+                ),
+
+                # =================================================
+                # 专家评分人数
+                # =================================================
+
                 func.coalesce(
-                    func.avg(
+                    func.sum(
                         case(
                             (
                                 RatingResultModel.reviewer_type
                                 == int(
                                     ReviewerType.EXPERT
                                 ),
-                                RatingResultModel.score,
+                                1,
                             ),
-                            else_=None,
+                            else_=0,
                         )
                     ),
-                    0.0,
+                    0,
                 ),
 
-                # -------------------------
+                # =================================================
                 # 大众点赞总数
-                # -------------------------
+                # =================================================
                 #
                 # 大众每人只能提交：
-                # 1 个赞 或 2 个赞。
                 #
-                # 注意这里使用 SUM，
-                # 不再计算大众平均分。
+                # 1 个赞
+                # 或
+                # 2 个赞
+                #
+                # 因此这里 SUM(score)
+                # 得到的就是大众原始点赞总数。
+                # =================================================
+
                 func.coalesce(
                     func.sum(
                         case(
@@ -990,17 +1090,37 @@ class RatingService:
                     0.0,
                 ),
 
-                # -------------------------
-                # 总提交人数
-                # -------------------------
+                # =================================================
+                # 大众评分人数
+                # =================================================
+
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                RatingResultModel.reviewer_type
+                                == int(
+                                    ReviewerType.PUBLIC
+                                ),
+                                1,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ),
+
+                # =================================================
+                # 总评分人数
+                # =================================================
 
                 func.count(
                     RatingResultModel.id
                 ),
 
-                # -------------------------
+                # =================================================
                 # 最后一次评分时间
-                # -------------------------
+                # =================================================
 
                 func.max(
                     RatingResultModel.create_time
@@ -1014,16 +1134,63 @@ class RatingService:
 
         (
             expert_average,
+            expert_count,
             public_like_count,
+            public_count,
             rating_count,
             update_time,
         ) = self.db.execute(
             stmt
         ).one()
 
+        # =========================================================
+        # 处理专家统计
+        # =========================================================
+
+        expert_count_value = int(
+            expert_count
+        )
+
+        expert_average_value = (
+            float(
+                expert_average
+            )
+            if expert_average is not None
+            else None
+        )
+
         # -------------------------
+        # 最终得分计算时：
+        #
+        # 如果当前还没有专家评分，
+        # 专家贡献按 0 计算。
+        # -------------------------
+
+        expert_score_for_calculation = (
+            expert_average_value
+            if expert_average_value is not None
+            else 0.0
+        )
+
+        # =========================================================
+        # 处理大众统计
+        # =========================================================
+
+        public_count_value = int(
+            public_count
+        )
+
+        public_like_count_value = float(
+            public_like_count
+        )
+
+        rating_count_value = int(
+            rating_count
+        )
+
+        # =========================================================
         # 计算专家 / 大众权重
-        # -------------------------
+        # =========================================================
 
         expert_weight = float(
             topic.expert_weight
@@ -1033,42 +1200,139 @@ class RatingService:
                 1 - expert_weight
         )
 
-        # -------------------------
-        # 计算最终得分
-        # -------------------------
+        # =========================================================
+        # 计算专家加权得分
+        # =========================================================
         #
         # 例如：
         #
+        # 专家平均分 = 60
         # 专家权重 = 0.6
-        # 专家平均分 = 80
         #
-        # 大众：
-        # 1 + 2 + 2 = 5 个赞
+        # 专家加权得分：
         #
-        # 专家贡献：
-        # 80 × 0.6 = 48
-        #
-        # 大众贡献：
-        # 5 × 0.4 = 2
-        #
-        # 最终得分：
-        # 48 + 2 = 50
-        # -------------------------
+        # 60 × 0.6 = 36
+        # =========================================================
 
-        final_score = (
-                float(expert_average)
+        expert_weighted_score = (
+                expert_score_for_calculation
                 * expert_weight
-                +
-                float(public_like_count)
+        )
+
+        # =========================================================
+        # 计算大众加权得分
+        # =========================================================
+        #
+        # 例如：
+        #
+        # 大众点赞总数 = 1
+        # 大众权重 = 0.4
+        #
+        # 大众加权得分：
+        #
+        # 1 × 0.4 = 0.4
+        # =========================================================
+
+        public_weighted_score = (
+                public_like_count_value
                 * public_weight
         )
 
+        # =========================================================
+        # 计算最终得分
+        # =========================================================
+        #
+        # 最终得分 =
+        #
+        # 专家加权得分
+        # +
+        # 大众加权得分
+        #
+        # 例如：
+        #
+        # 专家：
+        # 60 × 0.6 = 36
+        #
+        # 大众：
+        # 1 × 0.4 = 0.4
+        #
+        # 最终：
+        #
+        # 36 + 0.4 = 36.4
+        # =========================================================
+
+        final_score = (
+                expert_weighted_score
+                +
+                public_weighted_score
+        )
+
+        # =========================================================
+        # 返回实时统计
+        # =========================================================
+
         return RatingStatisticsResponse(
+            # -------------------------
+            # 最终得分
+            # -------------------------
+
             finalScore=round(
                 final_score,
                 2,
             ),
-            ratingCount=rating_count,
+
+            # -------------------------
+            # 总评分人数
+            # -------------------------
+
+            ratingCount=rating_count_value,
+
+            # -------------------------
+            # 当前是否区分专家 / 大众
+            # -------------------------
+
+            distinguishExpert=True,
+
+            # =====================================================
+            # 专家统计
+            # =====================================================
+
+            expertCount=expert_count_value,
+
+            expertAverageScore=(
+                round(
+                    expert_average_value,
+                    2,
+                )
+                if expert_average_value
+                   is not None
+                else None
+            ),
+
+            expertWeightedScore=round(
+                expert_weighted_score,
+                2,
+            ),
+
+            # =====================================================
+            # 大众统计
+            # =====================================================
+
+            publicCount=public_count_value,
+
+            publicLikeCount=int(
+                public_like_count_value
+            ),
+
+            publicWeightedScore=round(
+                public_weighted_score,
+                2,
+            ),
+
+            # -------------------------
+            # 最后评分时间
+            # -------------------------
+
             updateTime=update_time,
         )
 

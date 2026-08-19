@@ -75,16 +75,89 @@
     ========================== -->
     <main v-loading="loading" class="rating-content">
       <!-- 实时平均分 -->
+      <!-- 实时评分 -->
       <section class="score-panel">
-        <div class="score-title">实时得分</div>
+        <!-- =========================
+             核心评分区域
+        ========================== -->
+        <div
+          class="score-overview"
+          :class="{
+            'score-overview-distinguish': statistics.distinguishExpert,
+          }"
+        >
+          <!-- =========================
+               专家评分
+          ========================== -->
+          <div v-if="statistics.distinguishExpert" class="reviewer-stat">
+            <div class="reviewer-stat-title">专家评分</div>
 
-        <!-- 当前平均分 -->
-        <div class="score-content">
-          <span class="score-value">
-            {{ statistics.ratingCount === 0 ? '--' : statistics.finalScore.toFixed(2) }}
-          </span>
+            <div class="reviewer-stat-count">
+              <strong>
+                {{ statistics.expertCount }}
+              </strong>
+              <span>人</span>
+            </div>
 
-          <span class="score-total"> / 100 </span>
+            <div class="reviewer-stat-detail">
+              平均分
+
+              <strong>
+                {{ statistics.expertAverageScore === null ? '--' : statistics.expertAverageScore.toFixed(2) }}
+              </strong>
+            </div>
+
+            <div class="reviewer-stat-detail reviewer-stat-weighted">
+              加权得分
+
+              <strong>
+                {{ statistics.expertWeightedScore.toFixed(2) }}
+              </strong>
+            </div>
+          </div>
+
+          <!-- =========================
+               最终实时得分
+          ========================== -->
+          <div class="final-score">
+            <div class="score-title">实时得分</div>
+
+            <div class="score-content">
+              <span class="score-value">
+                {{ statistics.ratingCount === 0 ? '--' : statistics.finalScore.toFixed(2) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- =========================
+               大众评分
+          ========================== -->
+          <div v-if="statistics.distinguishExpert" class="reviewer-stat">
+            <div class="reviewer-stat-title">大众评分</div>
+
+            <div class="reviewer-stat-count">
+              <strong>
+                {{ statistics.publicCount }}
+              </strong>
+              <span>人</span>
+            </div>
+
+            <div class="reviewer-stat-detail">
+              点赞总数
+
+              <strong>
+                {{ statistics.publicLikeCount }}
+              </strong>
+            </div>
+
+            <div class="reviewer-stat-detail reviewer-stat-weighted">
+              加权得分
+
+              <strong>
+                {{ statistics.publicWeightedScore.toFixed(2) }}
+              </strong>
+            </div>
+          </div>
         </div>
 
         <!-- 无数据提示 -->
@@ -93,7 +166,7 @@
         <!-- 最后更新时间 -->
         <div v-else class="score-update-time">
           最后更新：
-          {{ statistics.updateTime || '-' }}
+          {{ formatDateTime(statistics.updateTime) || '-' }}
         </div>
 
         <!-- 评分中提示 -->
@@ -122,6 +195,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { RatingItem, RatingStatistics } from '@/types'
 
 import { finishRating, getRatingItem, getRatingStatistics, startRating } from '@/api/rating/rating'
+import { formatDateTime } from '@/utils/date.ts'
 
 const route = useRoute()
 
@@ -158,7 +232,19 @@ const finishing = ref(false)
  */
 const statistics = reactive<RatingStatistics>({
   finalScore: 0,
+
   ratingCount: 0,
+
+  distinguishExpert: false,
+
+  expertCount: 0,
+  expertAverageScore: null,
+  expertWeightedScore: 0,
+
+  publicCount: 0,
+  publicLikeCount: 0,
+  publicWeightedScore: 0,
+
   updateTime: null,
 })
 
@@ -291,7 +377,23 @@ async function loadStatistics() {
   })
 
   statistics.finalScore = result.finalScore
+
   statistics.ratingCount = result.ratingCount
+
+  statistics.distinguishExpert = result.distinguishExpert
+
+  statistics.expertCount = result.expertCount
+
+  statistics.expertAverageScore = result.expertAverageScore
+
+  statistics.publicCount = result.publicCount
+
+  statistics.expertWeightedScore = result.expertWeightedScore
+
+  statistics.publicLikeCount = result.publicLikeCount
+
+  statistics.publicWeightedScore = result.publicWeightedScore
+
   statistics.updateTime = result.updateTime
 }
 
@@ -306,7 +408,7 @@ function startStatisticsPolling() {
 
   statisticsTimer = window.setInterval(() => {
     loadStatistics()
-  }, 3000)
+  }, 1500)
 }
 
 /**
@@ -659,7 +761,7 @@ onBeforeUnmount(() => {
 ========================= */
 
 .score-panel {
-  width: min(760px, 100%);
+  width: min(900px, 100%);
   min-height: 400px;
 
   display: flex;
@@ -725,6 +827,156 @@ onBeforeUnmount(() => {
   color: #909399;
 
   font-size: 13px;
+}
+
+/* =========================
+   实时评分总览
+========================= */
+
+.score-overview {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 区分专家和大众时：
+   左 / 中 / 右三栏布局。 */
+.score-overview-distinguish {
+  display: grid;
+
+  grid-template-columns:
+    minmax(160px, 1fr)
+    minmax(260px, 1.4fr)
+    minmax(160px, 1fr);
+
+  align-items: center;
+
+  gap: 32px;
+}
+
+/* =========================
+   中间最终得分
+========================= */
+
+.final-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 0;
+}
+
+.score-title {
+  margin-bottom: 30px;
+
+  color: #606266;
+
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.score-content {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.score-value {
+  color: #303133;
+
+  font-size: 82px;
+  font-weight: 600;
+  line-height: 1;
+
+  letter-spacing: -2px;
+}
+
+/* =========================
+   专家 / 大众统计
+========================= */
+
+.reviewer-stat {
+  min-height: 150px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background: #f8f9fb;
+
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
+
+  box-sizing: border-box;
+}
+
+.reviewer-stat-title {
+  color: #606266;
+
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.reviewer-stat-count {
+  margin-top: 18px;
+
+  display: flex;
+  align-items: baseline;
+
+  gap: 5px;
+
+  color: #909399;
+
+  font-size: 14px;
+}
+
+.reviewer-stat-count strong {
+  color: #303133;
+
+  font-size: 30px;
+  font-weight: 600;
+}
+
+.reviewer-stat-detail {
+  margin-top: 12px;
+
+  color: #909399;
+
+  font-size: 13px;
+}
+
+.reviewer-stat-detail strong {
+  margin-left: 6px;
+
+  color: #606266;
+
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.reviewer-stat-weighted {
+  margin-top: 10px;
+
+  padding-top: 10px;
+
+  width: 100%;
+
+  text-align: center;
+
+  border-top: 1px solid #ebeef5;
+}
+
+.reviewer-stat-weighted strong {
+  color: #303133;
+
+  font-size: 18px;
+  font-weight: 600;
 }
 
 /* =========================

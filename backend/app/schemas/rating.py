@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import IntEnum
-from typing import Generic, TypeVar, Self
+from typing import Self
 
 from pydantic import (
     BaseModel,
@@ -442,8 +442,6 @@ class GetRatingItemRequest(BaseModel):
     )
 
 
-
-
 class RatingActionRequest(BaseModel):
     """
     评分项目操作请求。
@@ -519,37 +517,46 @@ class RatingStatusResponse(BaseModel):
 
 
 class RatingStatisticsResponse(BaseModel):
-    """
-    评分项目统计结果。
-    """
-
-    # 当前最终得分。
-    #
-    # 区分专家评委：
-    #   专家平均分 × 专家权重
-    #   +
-    #   大众点赞总数 × 大众权重
-    #
-    # 不区分专家评委：
-    #   大众点赞总数
     final_score: float = Field(
-        default=0.0,
         alias="finalScore",
-        description="当前最终得分",
     )
 
-    # 已提交评分人数。
     rating_count: int = Field(
-        default=0,
         alias="ratingCount",
-        description="已提交评分数量",
     )
 
-    # 最后一次评分提交时间。
+    distinguish_expert: bool = Field(
+        alias="distinguishExpert",
+    )
+
+    expert_count: int = Field(
+        alias="expertCount",
+    )
+
+    expert_average_score: float | None = Field(
+        default=None,
+        alias="expertAverageScore",
+    )
+
+    expert_weighted_score: float = Field(
+        alias="expertWeightedScore",
+    )
+
+    public_count: int = Field(
+        alias="publicCount",
+    )
+
+    public_like_count: int = Field(
+        alias="publicLikeCount",
+    )
+
+    public_weighted_score: float = Field(
+        alias="publicWeightedScore",
+    )
+
     update_time: datetime | None = Field(
         default=None,
         alias="updateTime",
-        description="最后一条评分提交时间",
     )
 
     model_config = ConfigDict(
@@ -682,6 +689,7 @@ class RatingTopicEntryResponse(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
+
 
 class UploadItemImageResponse(
     BaseModel
