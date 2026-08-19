@@ -1073,6 +1073,7 @@ class RatingService:
             self,
             page: int,
             page_size: int,
+            topic_id: int | None = None,
             item_name: str | None = None,
             reviewer_type: int | None = None,
             score: float | None = None,
@@ -1086,6 +1087,12 @@ class RatingService:
 
         # 查询条件。
         conditions = []
+
+        if topic_id is not None:
+            conditions.append(
+                RatingItemModel.topic_id
+                == topic_id
+            )
 
         if item_name:
             conditions.append(
@@ -1135,19 +1142,38 @@ class RatingService:
         stmt = (
             select(
                 RatingResultModel.id,
+
+                RatingItemModel.topic_id.label(
+                    "topic_id"
+                ),
+
+                RatingTopicModel.name.label(
+                    "topic_name"
+                ),
+
                 RatingResultModel.rating_item_id,
+
                 RatingItemModel.name.label(
                     "rating_item_name"
                 ),
+
                 RatingResultModel.client_id,
+
                 RatingResultModel.reviewer_type,
+
                 RatingResultModel.score,
+
                 RatingResultModel.create_time,
             )
             .join(
                 RatingItemModel,
                 RatingItemModel.id
                 == RatingResultModel.rating_item_id,
+            )
+            .outerjoin(
+                RatingTopicModel,
+                RatingTopicModel.id
+                == RatingItemModel.topic_id,
             )
             .where(*conditions)
             .order_by(
@@ -1168,11 +1194,21 @@ class RatingService:
         items = [
             RatingResultListItemResponse(
                 id=row.id,
+
+                topicId=row.topic_id,
+
+                topicName=row.topic_name,
+
                 ratingItemId=row.rating_item_id,
+
                 ratingItemName=row.rating_item_name,
+
                 clientId=row.client_id,
+
                 reviewerType=row.reviewer_type,
+
                 score=row.score,
+
                 createTime=row.create_time,
             )
             for row in rows

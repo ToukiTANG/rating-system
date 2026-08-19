@@ -567,40 +567,42 @@ class RatingResultListItemResponse(BaseModel):
     评分结果列表项。
     """
 
-    # 评分结果 ID。
     id: int
 
-    # 评分项目 ID。
+    topic_id: int | None = Field(
+        default=None,
+        alias="topicId",
+    )
+
+    topic_name: str | None = Field(
+        default=None,
+        alias="topicName",
+    )
+
     rating_item_id: int = Field(
         alias="ratingItemId",
     )
 
-    # 评分项目名称。
     rating_item_name: str = Field(
         alias="ratingItemName",
     )
 
-    # 客户端 ID。
     client_id: str = Field(
         alias="clientId",
     )
 
-    # 评委类型：
-    # 0 = 大众
-    # 1 = 专家
     reviewer_type: int = Field(
         alias="reviewerType",
     )
 
-    # 分数。
     score: float
 
-    # 提交时间。
     create_time: datetime = Field(
         alias="createTime",
     )
 
     model_config = ConfigDict(
+        from_attributes=True,
         populate_by_name=True,
     )
 

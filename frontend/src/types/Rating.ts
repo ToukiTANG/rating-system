@@ -89,17 +89,10 @@ export interface QueryRatingResultParams {
   page: number
   pageSize: number
 
+  topicId?: number
+
   itemName?: string
-
   reviewerType?: ReviewerType
-
-  /**
-   * 专家：
-   * 0 ~ 100
-   *
-   * 大众：
-   * 1 或 2
-   */
   score?: number
 }
 
@@ -109,6 +102,10 @@ export interface QueryRatingResultParams {
 export interface RatingResultItem {
   id: number
 
+  topicId: number | null
+
+  topicName: string | null
+
   ratingItemId: number
 
   ratingItemName: string
@@ -117,13 +114,6 @@ export interface RatingResultItem {
 
   reviewerType: ReviewerType
 
-  /**
-   * reviewerType = 1：
-   * 0 ~ 100 专家评分。
-   *
-   * reviewerType = 0：
-   * 1 或 2 个赞。
-   */
   score: number
 
   createTime: string

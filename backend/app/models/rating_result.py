@@ -3,6 +3,7 @@
 from datetime import datetime
 from enum import IntEnum
 
+from pydantic import Field
 from sqlalchemy import (
     DateTime,
     Float,
@@ -52,6 +53,16 @@ class RatingResultModel(Base):
         Integer,
         primary_key=True,
         autoincrement=True,
+    )
+
+    topic_id: int | None = Field(
+        default=None,
+        alias="topicId",
+    )
+
+    topic_name: str | None = Field(
+        default=None,
+        alias="topicName",
     )
 
     # 所属评分项目。

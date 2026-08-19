@@ -5,6 +5,11 @@
     ========================== -->
     <section class="search-panel">
       <el-form :model="searchForm" inline>
+        <el-form-item label="评分主题">
+          <el-select v-model="searchForm.topicId" placeholder="全部主题" clearable filterable style="width: 220px">
+            <el-option v-for="topic in topicOptions" :key="topic.id" :label="topic.name" :value="topic.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="评分项目">
           <el-input v-model="searchForm.itemName" placeholder="请输入项目名称" clearable style="width: 220px" @keyup.enter="handleSearch" />
         </el-form-item>
@@ -37,6 +42,12 @@
 
       <div class="table-wrapper">
         <el-table v-loading="loading" :data="tableData" border height="100%">
+          <el-table-column label="评分主题" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">
+              {{ row.topicName || '--' }}
+            </template>
+          </el-table-column>
+
           <el-table-column prop="ratingItemName" label="评分项目" min-width="200" show-overflow-tooltip />
 
           <el-table-column label="评委类型" width="130" align="center">
@@ -107,20 +118,23 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import type { RatingResultItem, ReviewerType } from '@/types'
+import type { RatingResultItem, RatingTopic, ReviewerType } from '@/types'
 
 import { queryRatingResults } from '@/api/rating/rating.ts'
 
 import { formatDateTime } from '@/utils/date.ts'
 import LikeIcon from '@/component/LikeIcon.vue'
+import { queryRatingTopic } from '@/api/rating/RatingTopic.ts'
 
 /**
  * 查询条件。
  */
 const searchForm = reactive<{
+  topicId: number | null
   itemName: string
   reviewerType: ReviewerType | null
 }>({
+  topicId: null,
   itemName: '',
   reviewerType: null,
 })
@@ -129,6 +143,11 @@ const searchForm = reactive<{
  * 表格加载状态。
  */
 const loading = ref(false)
+
+/**
+ * 评分主题列表。
+ */
+const topicOptions = ref<RatingTopic[]>([])
 
 /**
  * 表格数据。
@@ -156,13 +175,10 @@ async function loadData() {
 
       pageSize: pagination.pageSize,
 
+      topicId: searchForm.topicId ?? undefined,
+
       itemName: searchForm.itemName.trim() || undefined,
 
-      /**
-       * reviewerType = 0 是合法值，
-       * 因此这里必须使用 ??，
-       * 不能使用 ||。
-       */
       reviewerType: searchForm.reviewerType ?? undefined,
     })
 
@@ -172,6 +188,21 @@ async function loadData() {
   } finally {
     loading.value = false
   }
+}
+
+/**
+ * 加载评分主题列表。
+ *
+ * 当前用于评分结果查询条件，
+ * 因此这里只需要加载主题基础信息。
+ */
+async function loadTopics() {
+  const response = await queryRatingTopic({
+    page: 1,
+    pageSize: 100,
+  })
+
+  topicOptions.value = response.list
 }
 
 /**
@@ -188,6 +219,8 @@ function handleSearch() {
  */
 function handleReset() {
   searchForm.itemName = ''
+
+  searchForm.topicId = null
 
   searchForm.reviewerType = null
 
@@ -233,6 +266,7 @@ function formatClientId(clientId: string): string {
 }
 
 onMounted(() => {
+  loadTopics()
   loadData()
 })
 </script>

@@ -367,6 +367,9 @@ def query_results(
             ge=1,
             le=100,
         ),
+        topicId: int | None = Query(
+            default=None,
+        ),
         itemName: str | None = Query(
             default=None,
         ),
@@ -390,6 +393,7 @@ def query_results(
     result = service.query_results(
         page=page,
         page_size=pageSize,
+        topic_id=topicId,
         item_name=itemName,
         reviewer_type=reviewerType,
         score=score,
