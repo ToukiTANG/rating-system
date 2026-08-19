@@ -711,3 +711,52 @@ class UploadItemImageResponse(
     """
 
     url: str
+
+
+class RatingTopicItemStatisticResponse(BaseModel):
+    """
+    Topic 下单个评分项目的统计结果。
+    """
+
+    item_id: int = Field(
+        alias="itemId",
+    )
+
+    item_name: str = Field(
+        alias="itemName",
+    )
+
+    final_score: float | None = Field(
+        default=None,
+        alias="finalScore",
+    )
+
+    rating_count: int = Field(
+        alias="ratingCount",
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+
+class RatingTopicStatisticsResponse(BaseModel):
+    """
+    Topic 下所有 Item 的当前评分统计。
+    """
+
+    topic_id: int = Field(
+        alias="topicId",
+    )
+
+    topic_name: str = Field(
+        alias="topicName",
+    )
+
+    items: list[
+        RatingTopicItemStatisticResponse
+    ]
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )

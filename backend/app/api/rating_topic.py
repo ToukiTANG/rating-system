@@ -9,7 +9,7 @@ from app.schemas.rating import (
     DeleteRatingTopicRequest,
     RatingTopicEntryResponse,
     RatingTopicResponse,
-    UpdateRatingTopicRequest,
+    UpdateRatingTopicRequest, RatingTopicStatisticsResponse,
 )
 from app.services.rating_topic_service import RatingTopicService
 
@@ -271,6 +271,48 @@ def get_rating_entry(
         topic_id=topic_id,
         client_id=client_id,
         expert_token=expert_token,
+    )
+
+    return ApiResponse(
+        data=result,
+    )
+
+
+# =========================================================
+# 获取评分主题统计
+# =========================================================
+
+
+@router.get(
+    path="/statistics",
+    response_model=ApiResponse[
+        RatingTopicStatisticsResponse
+    ],
+)
+def get_rating_topic_statistics(
+        db: SessionDep,
+        topic_id: Annotated[
+            int,
+            Query(
+                alias="topicId",
+                ge=1,
+                description="评分主题 ID",
+            ),
+        ],
+) -> ApiResponse[
+    RatingTopicStatisticsResponse
+]:
+    """
+    获取指定 Topic 下所有 RatingItem 的当前评分统计。
+
+    返回结果按照最终得分从高到低排列，
+    暂无评分数据的 RatingItem 排在最后。
+    """
+
+    service = RatingTopicService(db)
+
+    result = service.get_statistics(
+        topic_id=topic_id,
     )
 
     return ApiResponse(

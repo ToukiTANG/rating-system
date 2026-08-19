@@ -5,7 +5,7 @@ from secrets import token_urlsafe
 from sqlalchemy import (
     func,
     literal,
-    select,
+    select, case,
 )
 from sqlalchemy.dialects.sqlite import (
     insert as sqlite_insert,
@@ -17,7 +17,7 @@ from app.models.rating_item import RatingItemModel
 from app.models.rating_item_participant import (
     RatingItemParticipantModel,
 )
-from app.models.rating_result import ReviewerType
+from app.models.rating_result import ReviewerType, RatingResultModel
 from app.models.rating_topic import RatingTopicModel
 from app.schemas.common import PageResult
 from app.schemas.rating import (
@@ -26,7 +26,7 @@ from app.schemas.rating import (
     RatingTopicEntryResponse,
     RatingTopicResponse,
     TopicActiveRatingItemResponse,
-    UpdateRatingTopicRequest,
+    UpdateRatingTopicRequest, RatingTopicStatisticsResponse, RatingTopicItemStatisticResponse,
 )
 
 
@@ -890,3 +890,288 @@ class RatingTopicService:
         # participant 是独立的资格记录，
         # 在进入评分页面时即正式占用名额。
         self.db.commit()
+
+    # =========================================================
+    # Topic 评分统计
+    # =========================================================
+
+    def get_statistics(
+            self,
+            topic_id: int,
+    ) -> RatingTopicStatisticsResponse:
+        """
+        获取指定 Topic 下所有 RatingItem 的当前评分统计。
+
+        评分规则：
+
+        1. 不区分专家：
+           所有参与者均采用 0~100 分制，
+           Item 最终得分为所有评分的平均分。
+
+        2. 区分专家：
+           专家采用 0~100 分制，
+           大众采用 1 / 2 点赞评分。
+
+           最终得分 =
+               专家平均分 × 专家权重
+               +
+               大众点赞总数 × 大众权重
+
+        返回结果：
+        - 包含 Topic 下所有 RatingItem
+        - 有评分数据的 Item 按最终得分从高到低排列
+        - 无评分数据的 Item 排在最后
+        """
+
+        # -------------------------
+        # 查询 Topic
+        # -------------------------
+
+        topic = self.db.get(
+            RatingTopicModel,
+            topic_id,
+        )
+
+        if topic is None:
+            raise BusinessException(
+                code=11001,
+                message="评分主题不存在",
+                status_code=404,
+            )
+
+        # -------------------------
+        # 校验专家评分配置
+        # -------------------------
+
+        if (
+                topic.distinguish_expert
+                and topic.expert_weight is None
+        ):
+            raise BusinessException(
+                code=11016,
+                message="评分主题专家权重配置异常",
+                status_code=500,
+            )
+
+        # -------------------------
+        # 聚合 Topic 下所有 Item 的评分数据
+        # -------------------------
+        #
+        # 使用 LEFT OUTER JOIN：
+        #
+        # 即使某个 RatingItem 当前没有任何评分，
+        # 也必须出现在统计结果中。
+        #
+        # 一次 GROUP BY 同时取得：
+        #
+        # - 总评分人数
+        # - 全部评分平均分
+        # - 专家平均分
+        # - 大众点赞总数
+        #
+        # 避免针对每个 Item 单独查询造成 N+1。
+        # -------------------------
+
+        stmt = (
+            select(
+                RatingItemModel.id.label(
+                    "item_id"
+                ),
+
+                RatingItemModel.name.label(
+                    "item_name"
+                ),
+
+                func.count(
+                    RatingResultModel.id
+                ).label(
+                    "rating_count"
+                ),
+
+                # 不区分专家时使用。
+                func.avg(
+                    RatingResultModel.score
+                ).label(
+                    "average_score"
+                ),
+
+                # 区分专家时：
+                # 专家最终使用平均分。
+                func.avg(
+                    case(
+                        (
+                            RatingResultModel.reviewer_type
+                            == int(
+                                ReviewerType.EXPERT
+                            ),
+                            RatingResultModel.score,
+                        ),
+                        else_=None,
+                    )
+                ).label(
+                    "expert_average_score"
+                ),
+
+                # 区分专家时：
+                # 大众 score 实际表示 1 / 2 个赞，
+                # 因此需要累计总点赞数。
+                func.sum(
+                    case(
+                        (
+                            RatingResultModel.reviewer_type
+                            == int(
+                                ReviewerType.PUBLIC
+                            ),
+                            RatingResultModel.score,
+                        ),
+                        else_=0,
+                    )
+                ).label(
+                    "public_like_count"
+                ),
+            )
+            .select_from(
+                RatingItemModel
+            )
+            .outerjoin(
+                RatingResultModel,
+                RatingResultModel.rating_item_id
+                == RatingItemModel.id,
+            )
+            .where(
+                RatingItemModel.topic_id
+                == topic.id
+            )
+            .group_by(
+                RatingItemModel.id,
+                RatingItemModel.name,
+            )
+        )
+
+        rows = self.db.execute(
+            stmt
+        ).all()
+
+        # -------------------------
+        # 计算每个 Item 的最终得分
+        # -------------------------
+
+        items: list[
+            RatingTopicItemStatisticResponse
+        ] = []
+
+        for row in rows:
+
+            rating_count = int(
+                row.rating_count or 0
+            )
+
+            # 当前 Item 没有任何评分。
+            if rating_count == 0:
+
+                final_score = None
+
+            # -------------------------
+            # 统一评分模式
+            # -------------------------
+            #
+            # distinguish_expert=False：
+            #
+            # 所有人虽然内部按照 PUBLIC 身份记录，
+            # 但 score 都是 0~100 分。
+            #
+            # 因此最终分直接取所有评分平均值。
+            # -------------------------
+
+            elif not topic.distinguish_expert:
+
+                final_score = round(
+                    float(
+                        row.average_score
+                    ),
+                    2,
+                )
+
+            # -------------------------
+            # 专家 / 大众混合评分模式
+            # -------------------------
+
+            else:
+
+                expert_average_score = (
+                    float(
+                        row.expert_average_score
+                    )
+                    if row.expert_average_score
+                       is not None
+                    else 0.0
+                )
+
+                public_like_count = float(
+                    row.public_like_count
+                    or 0
+                )
+
+                expert_weight = float(
+                    topic.expert_weight
+                )
+
+                public_weight = (
+                        1.0
+                        - expert_weight
+                )
+
+                final_score = round(
+                    (
+                            expert_average_score
+                            * expert_weight
+                    )
+                    +
+                    (
+                            public_like_count
+                            * public_weight
+                    ),
+                    2,
+                )
+
+            items.append(
+                RatingTopicItemStatisticResponse(
+                    itemId=row.item_id,
+                    itemName=row.item_name,
+                    finalScore=final_score,
+                    ratingCount=rating_count,
+                )
+            )
+
+        # -------------------------
+        # 排序
+        # -------------------------
+        #
+        # 排序规则：
+        #
+        # 1. 有评分数据优先
+        # 2. finalScore 从高到低
+        # 3. 同分时按照 Item ID 升序
+        # 4. 无评分数据统一排在最后
+        # -------------------------
+
+        items.sort(
+            key=lambda item: (
+                item.final_score is None,
+
+                -(
+                    item.final_score
+                    if item.final_score
+                       is not None
+                    else 0.0
+                ),
+
+                item.item_id,
+            )
+        )
+
+        return RatingTopicStatisticsResponse(
+            topicId=topic.id,
+            topicName=topic.name,
+            items=items,
+        )

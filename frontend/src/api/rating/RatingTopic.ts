@@ -1,6 +1,5 @@
 import { get, post } from '@/api/request'
 
-
 import type {
   PageResult,
   RatingTopic,
@@ -8,6 +7,7 @@ import type {
   RatingTopicDeleteRequest,
   RatingTopicEntry,
   RatingTopicQueryParams,
+  RatingTopicStatistics,
   RatingTopicUpdateRequest,
 } from '@/types'
 
@@ -59,4 +59,13 @@ export function deleteRatingTopic(data: RatingTopicDeleteRequest): Promise<boole
  */
 export function getRatingTopicEntry(params: { topicId: number; clientId: string; expertToken?: string }): Promise<RatingTopicEntry> {
   return get<RatingTopicEntry>('/ratingTopic/entry', params)
+}
+
+/**
+ * 获取 Topic 下所有 RatingItem 的当前评分统计。
+ */
+export function getRatingTopicStatistics(topicId: number): Promise<RatingTopicStatistics> {
+  return get<RatingTopicStatistics>('/ratingTopic/statistics', {
+    topicId,
+  })
 }

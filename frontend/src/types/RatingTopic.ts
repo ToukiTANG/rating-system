@@ -116,3 +116,39 @@ export interface RatingTopicEntry {
    */
   activeItem: TopicActiveRatingItem | null
 }
+
+/**
+ * Topic 下单个 RatingItem 的评分统计。
+ */
+export interface RatingTopicItemStatistic {
+  itemId: number
+
+  itemName: string
+
+  /**
+   * 当前最终得分。
+   *
+   * null 表示当前没有任何评分数据。
+   */
+  finalScore: number | null
+
+  /**
+   * 已提交评分人数。
+   */
+  ratingCount: number
+}
+
+/**
+ * Topic 下所有 RatingItem 的评分统计。
+ */
+export interface RatingTopicStatistics {
+  topicId: number
+
+  topicName: string
+
+  /**
+   * 已由后端按照最终得分从高到低排序。
+   * 暂无评分数据的 Item 位于最后。
+   */
+  items: RatingTopicItemStatistic[]
+}

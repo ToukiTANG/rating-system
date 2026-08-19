@@ -58,10 +58,14 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="220" fixed="right" align="center">
+          <el-table-column label="操作" width="290" fixed="right" align="center">
             <template #default="{ row }">
               <el-button link type="primary" @click="handleUpdate(row)"> 编辑 </el-button>
+
+              <el-button link type="success" @click="handleOpenStatistics(row)"> 评分统计 </el-button>
+
               <el-button link type="warning" @click="handleGenerateQrCode(row)"> 生成二维码 </el-button>
+
               <el-button link type="danger" @click="handleDelete(row)"> 删除 </el-button>
             </template>
           </el-table-column>
@@ -181,6 +185,18 @@ function handleOpenRatingItems(row: RatingTopic) {
 }
 
 /**
+ * 跳转到当前 Topic 的评分统计页面。
+ */
+function handleOpenStatistics(row: RatingTopic) {
+  router.push({
+    name: 'RatingStatics',
+    params: {
+      topicId: row.id.toString(),
+    },
+  })
+}
+
+/**
  * 生成 Topic 二维码。
  */
 function handleGenerateQrCode(row: RatingTopic) {
@@ -220,7 +236,7 @@ async function handleDelete(row: RatingTopic) {
 }
 
 function formatExpertMode(row: RatingTopic) {
-  return row.distinguishExpert ? '区分专家' : '仅大众'
+  return row.distinguishExpert ? '区分专家' : '统一评分'
 }
 
 function formatExpertWeight(row: RatingTopic) {
