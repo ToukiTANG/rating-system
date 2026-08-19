@@ -63,9 +63,9 @@
 
               <!-- 大众点赞 -->
               <div v-else class="public-score-cell">
-                <span class="like-icons">
-                  {{ row.score === 2 ? '👍 👍' : '👍' }}
-                </span>
+                <div class="like-icons">
+                  <LikeIcon v-for="value in row.score" :key="value" class="like-icon" />
+                </div>
 
                 <span class="like-count"> {{ row.score }} 个赞 </span>
               </div>
@@ -109,9 +109,10 @@ import { onMounted, reactive, ref } from 'vue'
 
 import type { RatingResultItem, ReviewerType } from '@/types'
 
-import { queryRatingResults } from '@/api/rating/rating'
+import { queryRatingResults } from '@/api/rating/rating.ts'
 
 import { formatDateTime } from '@/utils/date.ts'
+import LikeIcon from '@/component/LikeIcon.vue'
 
 /**
  * 查询条件。
@@ -348,9 +349,20 @@ onMounted(() => {
 }
 
 .like-icons {
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+
+  color: var(--el-color-danger);
 
   white-space: nowrap;
+}
+
+.like-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .like-count {

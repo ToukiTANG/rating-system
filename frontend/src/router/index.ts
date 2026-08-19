@@ -36,7 +36,7 @@ const router = createRouter({
         {
           path: 'RatingResult',
           name: 'RatingResult',
-          component: () => import('@/views/rating/RatingResult.vue'),
+          component: () => import('@/views/rating/result/RatingResult.vue'),
           meta: {
             title: '评分记录',
           },

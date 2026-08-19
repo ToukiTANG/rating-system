@@ -96,9 +96,9 @@
               <!-- 大众 -->
               <template v-else>
                 <div class="submitted-like">
-                  <span class="submitted-like-icons">
-                    {{ submittedScore === 2 ? '👍 👍' : '👍' }}
-                  </span>
+                  <div class="submitted-like-icons">
+                    <LikeIcon v-for="value in submittedScore" :key="value" class="submitted-like-icon" />
+                  </div>
 
                   <span class="submitted-score-value">
                     您提交了
@@ -112,7 +112,6 @@
             </div>
           </template>
 
-          <!-- 可以评分 -->
           <!-- 可以评分 -->
           <template v-else>
             <!-- =========================
@@ -148,48 +147,33 @@
             <template v-else-if="reviewerType === 0">
               <div class="score-title">请为该项目点赞</div>
 
-              <div class="score-description">请选择 1 个赞或 2 个赞，提交后无法修改。</div>
+              <div class="score-description">点击点赞图标进行评分，最多可选择 2 个赞，提交后无法修改。</div>
 
-              <div class="public-like-options">
-                <!-- 1 个赞 -->
+              <div class="public-like-rate">
                 <button
+                  v-for="value in 2"
+                  :key="value"
                   type="button"
-                  class="like-option"
+                  class="like-rate-item"
                   :class="{
-                    'like-option-active': score === 1,
+                    'like-rate-item-active': value <= displayLikeScore,
                   }"
-                  @click="score = 1"
+                  @mouseenter="hoverLikeScore = value"
+                  @mouseleave="hoverLikeScore = null"
+                  @click="score = value"
                 >
-                  <div class="like-icons">👍</div>
-
-                  <div class="like-option-title">1 个赞</div>
-                </button>
-
-                <!-- 2 个赞 -->
-                <button
-                  type="button"
-                  class="like-option"
-                  :class="{
-                    'like-option-active': score === 2,
-                  }"
-                  @click="score = 2"
-                >
-                  <div class="like-icons">👍 👍</div>
-
-                  <div class="like-option-title">2 个赞</div>
+                  <LikeIcon class="like-rate-icon" />
                 </button>
               </div>
 
               <div class="score-value">
                 <template v-if="score !== null">
                   当前选择：
-                  <strong>
-                    {{ score }}
-                  </strong>
+                  <strong>{{ score }}</strong>
                   个赞
                 </template>
 
-                <template v-else> 请选择点赞数量 </template>
+                <template v-else> 请点击点赞 </template>
               </div>
             </template>
 
@@ -223,6 +207,7 @@ import { getRatingItem, getRatingStatus, submitScore } from '@/api/rating/rating
 
 import { getClientId } from '@/utils/client'
 import { getRatingTopicEntry } from '@/api/rating/RatingTopic.ts'
+import LikeIcon from '@/component/LikeIcon.vue'
 
 const route = useRoute()
 
@@ -284,6 +269,23 @@ const submitting = ref(false)
  * 尚未选择评分。
  */
 const score = ref<number | null>(null)
+
+/**
+ * 大众点赞 hover 状态。
+ *
+ * 用于实现类似 Rate 组件的预览效果。
+ */
+const hoverLikeScore = ref<number | null>(null)
+
+/**
+ * 当前用于 UI 展示的点赞数量。
+ *
+ * hover 时优先展示 hover 数量，
+ * 否则展示已经选择的 score。
+ */
+const displayLikeScore = computed(() => {
+  return hoverLikeScore.value ?? score.value ?? 0
+})
 
 /**
  * 当前客户端是否已经提交过评分。
@@ -849,12 +851,28 @@ onMounted(() => {
 }
 
 .submitted-score {
+  width: 100%;
+
   display: flex;
   align-items: center;
+  justify-content: center;
 
   gap: 18px;
 
   margin-top: 36px;
+}
+
+.submitted-like {
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 16px;
+
+  text-align: center;
 }
 
 .submitted-score-value {
@@ -887,82 +905,81 @@ onMounted(() => {
 }
 
 /* =========================
-   大众点赞
+   大众点赞评分
 ========================= */
 
-.public-like-options {
+.public-like-rate {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
 
-  gap: 24px;
+  gap: 20px;
 
   margin-top: 44px;
 }
 
-.like-option {
-  width: 180px;
-  height: 150px;
-
+.like-rate-item {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
 
-  border: 2px solid #dcdfe6;
-  border-radius: 12px;
+  width: 72px;
+  height: 72px;
 
-  background: #ffffff;
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+
+  color: #c0c4cc;
 
   cursor: pointer;
 
   transition:
-    border-color 0.2s,
-    background-color 0.2s,
-    transform 0.2s;
-
-  box-sizing: border-box;
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
-.like-option:hover {
-  border-color: var(--el-color-primary-light-3);
+.like-rate-icon {
+  width: 52px;
+  height: 52px;
 
-  transform: translateY(-2px);
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
-.like-option-active {
-  border-color: var(--el-color-primary);
-
-  background: var(--el-color-primary-light-9);
+/* hover 时稍微放大 */
+.like-rate-item:hover {
+  transform: scale(1.08);
 }
 
-.like-icons {
-  font-size: 40px;
-  line-height: 1;
+/* 已选中的赞 */
+.like-rate-item-active {
+  color: var(--el-color-danger);
 }
 
-.like-option-title {
-  margin-top: 18px;
-
-  color: #303133;
-
-  font-size: 16px;
-  font-weight: 600;
+/* 点击反馈 */
+.like-rate-item:active {
+  transform: scale(0.94);
 }
 
 /* =========================
    已提交点赞
 ========================= */
 
-.submitted-like {
+.submitted-like-icons {
   display: flex;
   align-items: center;
+  gap: 8px;
 
-  gap: 16px;
+  color: var(--el-color-danger);
 }
 
-.submitted-like-icons {
-  font-size: 32px;
+.submitted-like-icon {
+  width: 32px;
+  height: 32px;
 }
 
 .submitted-score-value strong {
