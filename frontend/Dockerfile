@@ -9,7 +9,7 @@ RUN npm ci --registry=https://mirrors.cloud.tencent.com/npm/
 
 COPY . .
 
-RUN npm run build
+RUN npm run build-only
 
 
 FROM nginx:alpine
