@@ -4,7 +4,7 @@
     <section class="search-panel">
       <el-form :inline="true" @submit.prevent>
         <el-form-item label="主题名称">
-          <el-input v-model="queryParams.name" placeholder="请输入评分主题名称" clearable @keyup.enter="handleSearch" />
+          <el-input v-model="queryParams.name" placeholder="请输入评分主题名称" clearable style="width: 220px" @keyup.enter="handleSearch" />
         </el-form-item>
 
         <el-form-item>
@@ -24,7 +24,8 @@
       </div>
 
       <div class="table-wrapper">
-        <el-table v-loading="loading" :data="topicList" height="100%" border>
+        <el-table v-loading="loading" :data="topicList" stripe height="100%" border>
+          <el-table-column type="index" label="序号" width="70" align="center" />
           <el-table-column prop="name" label="主题名称" min-width="160" />
 
           <el-table-column prop="description" label="描述" min-width="220" show-overflow-tooltip />
@@ -213,54 +214,94 @@ onMounted(() => {
 
 <style scoped>
 .rating-topic-page {
+  width: 100%;
+  height: 100%;
+
   display: flex;
   flex-direction: column;
 
   gap: 16px;
 
-  width: 100%;
-  height: 100%;
+  box-sizing: border-box;
+}
+
+/* =========================
+   查询区域
+========================= */
+
+.search-panel {
+  flex-shrink: 0;
+
+  padding: 20px 20px 2px;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
 
   box-sizing: border-box;
 }
 
-.search-panel {
-  padding: 16px 16px 0;
-  background: var(--el-bg-color);
-  border-radius: 8px;
+.search-panel :deep(.el-form-item__label) {
+  color: #606266;
+
+  font-size: 14px;
 }
+
+/* =========================
+   表格区域
+========================= */
 
 .table-panel {
   flex: 1;
+
   min-height: 0;
-  padding: 16px;
-  background: var(--el-bg-color);
-  border-radius: 8px;
 
   display: flex;
   flex-direction: column;
+
+  padding: 20px;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+
+  box-sizing: border-box;
 }
 
+/* =========================
+   表格工具栏
+========================= */
+
 .table-toolbar {
+  flex-shrink: 0;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   margin-bottom: 16px;
 }
 
 .table-title {
+  color: #303133;
+
   font-size: 16px;
   font-weight: 600;
+  line-height: 24px;
 }
 
-.table-wrapper {
-  flex: 1;
-  min-height: 0;
-}
+/* =========================
+   分页
+========================= */
 
 .pagination-wrapper {
+  flex-shrink: 0;
+
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+
+  padding-top: 16px;
 }
 </style>

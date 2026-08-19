@@ -41,7 +41,8 @@
       </div>
 
       <div class="table-wrapper">
-        <el-table v-loading="loading" :data="tableData" border height="100%">
+        <el-table v-loading="loading" :data="tableData" border stripe height="100%">
+          <el-table-column type="index" label="序号" width="70" align="center" />
           <el-table-column label="评分主题" min-width="180" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.topicName || '--' }}
@@ -273,12 +274,15 @@ onMounted(() => {
 
 <style scoped>
 .rating-result-page {
+  width: 100%;
   height: 100%;
 
   display: flex;
   flex-direction: column;
 
   gap: 16px;
+
+  box-sizing: border-box;
 }
 
 /* =========================
@@ -292,7 +296,16 @@ onMounted(() => {
 
   background: #ffffff;
 
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
+
+  box-sizing: border-box;
+}
+
+.search-panel :deep(.el-form-item__label) {
+  color: #606266;
+
+  font-size: 14px;
 }
 
 /* =========================
@@ -311,13 +324,19 @@ onMounted(() => {
 
   background: #ffffff;
 
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
 
   box-sizing: border-box;
 }
 
+/* =========================
+   表格标题
+========================= */
+
 .table-header {
   flex-shrink: 0;
+  height: 32px;
 
   display: flex;
   align-items: center;
@@ -331,18 +350,14 @@ onMounted(() => {
 
   font-size: 16px;
   font-weight: 600;
+  line-height: 24px;
 }
 
 .table-total {
   color: #909399;
 
   font-size: 13px;
-}
-
-.table-wrapper {
-  flex: 1;
-
-  min-height: 0;
+  line-height: 20px;
 }
 
 /* =========================

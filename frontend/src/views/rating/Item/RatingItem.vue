@@ -114,8 +114,7 @@ import { Plus } from '@element-plus/icons-vue'
 
 import { useRouter } from 'vue-router'
 
-
-import type { RatingItem, SearchForm,RatingTopic } from '@/types'
+import type { RatingItem, SearchForm, RatingTopic } from '@/types'
 
 import { deleteRatingItem, getRatingItemList } from '@/api/rating/rating.ts'
 
@@ -378,13 +377,13 @@ onMounted(async () => {
 
 <style scoped>
 .rating-item-page {
+  width: 100%;
+  height: 100%;
+
   display: flex;
   flex-direction: column;
 
   gap: 16px;
-
-  width: 100%;
-  height: 100%;
 
   box-sizing: border-box;
 }
@@ -394,6 +393,8 @@ onMounted(async () => {
 ========================= */
 
 .search-panel {
+  flex-shrink: 0;
+
   padding: 20px 20px 2px;
 
   background: #ffffff;
@@ -402,6 +403,12 @@ onMounted(async () => {
   border-radius: 8px;
 
   box-sizing: border-box;
+}
+
+.search-panel :deep(.el-form-item__label) {
+  color: #606266;
+
+  font-size: 14px;
 }
 
 .search-form {
@@ -414,6 +421,7 @@ onMounted(async () => {
 
 .table-panel {
   flex: 1;
+
   min-height: 0;
 
   display: flex;
@@ -430,11 +438,21 @@ onMounted(async () => {
 }
 
 .table-toolbar {
+  flex-shrink: 0;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
 
   margin-bottom: 16px;
+}
+
+.table-title {
+  color: #303133;
+
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
 }
 
 .toolbar-left,
@@ -443,19 +461,8 @@ onMounted(async () => {
   align-items: center;
 }
 
-.table-title {
-  font-size: 16px;
-  font-weight: 600;
-
-  color: #303133;
-}
-
 :deep(.operation-column) {
   border-left: 1px solid var(--el-table-border-color) !important;
-}
-
-.empty-value {
-  color: #909399;
 }
 
 /* =========================
@@ -463,10 +470,11 @@ onMounted(async () => {
 ========================= */
 
 .pagination-wrapper {
+  flex-shrink: 0;
+
   display: flex;
   justify-content: flex-end;
 
-  margin-top: auto;
-  padding-top: 20px;
+  padding-top: 16px;
 }
 </style>
