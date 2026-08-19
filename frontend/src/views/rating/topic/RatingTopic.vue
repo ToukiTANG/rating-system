@@ -28,7 +28,7 @@
           <el-table-column type="index" label="序号" width="70" align="center" />
           <el-table-column label="主题名称" min-width="160" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-link type="primary" :underline="false" @click="handleOpenRatingItems(row)">
+              <el-link type="primary" underline="never" @click="handleOpenRatingItems(row)">
                 {{ row.name }}
               </el-link>
             </template>
