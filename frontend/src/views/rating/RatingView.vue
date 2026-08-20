@@ -4,49 +4,54 @@
          顶部评分项目信息
     ========================== -->
     <header class="rating-header">
-      <div class="header-top">
-        <!-- 左侧项目信息 -->
-        <div class="header-left">
-          <!-- 返回按钮 -->
-          <el-button link class="back-button" @click="handleBack">
-            <el-icon>
-              <ArrowLeft />
-            </el-icon>
+      <!-- =========================
+           返回按钮
+      ========================== -->
+      <div class="header-back-row">
+        <el-button link class="back-button" @click="handleBack">
+          <el-icon>
+            <ArrowLeft />
+          </el-icon>
 
-            返回评分项目
-          </el-button>
+          返回评分项目
+        </el-button>
+      </div>
 
-          <!-- 项目信息 -->
-          <div class="item-overview">
-            <!-- 项目图片 -->
-            <el-image
-              v-if="ratingItem?.imageUrl"
-              :src="ratingItem.imageUrl"
-              :preview-src-list="[ratingItem.imageUrl]"
-              fit="cover"
-              class="item-image"
-              preview-teleported
-              hide-on-click-modal
-            />
+      <!-- =========================
+           Header 主体
+      ========================== -->
+      <div class="header-main">
+        <!-- 左侧项目图片 -->
+        <div class="header-image-area">
+          <el-image
+            v-if="ratingItem?.imageUrl"
+            :src="ratingItem.imageUrl"
+            :preview-src-list="[ratingItem.imageUrl]"
+            fit="cover"
+            class="item-image"
+            preview-teleported
+            hide-on-click-modal
+          />
+        </div>
 
-            <!-- 项目文字信息 -->
-            <div class="item-info">
-              <!-- 项目名称和当前状态 -->
-              <div class="title-row">
-                <h1 class="rating-title">
-                  {{ ratingItem?.name || '评分项目' }}
-                </h1>
+        <!-- =========================
+             Header 几何中心
+        ========================== -->
+        <div class="header-center">
+          <!-- 项目名称和状态 -->
+          <div class="title-row">
+            <h1 class="rating-title">
+              {{ ratingItem?.name || '评分项目' }}
+            </h1>
 
-                <el-tag v-if="ratingItem" :type="statusInfo.type" size="large">
-                  {{ statusInfo.label }}
-                </el-tag>
-              </div>
+            <el-tag v-if="ratingItem" :type="statusInfo.type" size="large">
+              {{ statusInfo.label }}
+            </el-tag>
+          </div>
 
-              <!-- 项目描述 -->
-              <div class="description">
-                {{ ratingItem?.description || '-' }}
-              </div>
-            </div>
+          <!-- 项目描述 -->
+          <div class="description">
+            {{ ratingItem?.description || '-' }}
           </div>
         </div>
 
@@ -58,7 +63,9 @@
         </div>
       </div>
 
-      <!-- 项目辅助信息 -->
+      <!-- =========================
+           项目辅助信息
+      ========================== -->
       <div v-if="ratingItem" class="meta-info">
         <div class="meta-item">
           <span class="meta-label"> 项目 ID </span>
@@ -219,6 +226,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { RatingItem, RatingStatistics } from '@/types'
 
 import { finishRating, getRatingItem, getRatingStatistics, startRating } from '@/api/rating/rating'
+
 import { formatDateTime } from '@/utils/date.ts'
 
 const route = useRoute()
@@ -479,20 +487,11 @@ async function handleStartRating() {
 
   try {
     /**
-     * 调用后端开始评分接口。
-     *
-     * 后端负责完成：
-     *
-     * status: 0 -> 1
-     */
-    const result = await startRating({
-      id: item.id,
-    })
-
-    /**
      * 项目状态以后端返回结果为准。
      */
-    ratingItem.value = result
+    ratingItem.value = await startRating({
+      id: item.id,
+    })
 
     ElMessage.success('评分已开始')
 
@@ -625,37 +624,61 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
 }
 
-.header-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+/* =========================
+   返回按钮
+========================= */
 
-  gap: 32px;
-}
+.header-back-row {
+  width: 100%;
 
-.header-left {
-  flex: 1;
-
-  min-width: 0;
+  margin-bottom: 16px;
 }
 
 .back-button {
-  margin-bottom: 16px;
-
   padding-left: 0;
 }
 
 /* =========================
-   项目信息
+   Header 主体三栏布局
 ========================= */
 
-.item-overview {
-  display: flex;
+.header-main {
+  width: 100%;
+
+  display: grid;
+
+  /*
+   * 左右两侧使用完全相同的 1fr。
+   *
+   * 因此中间 auto 列无论：
+   *
+   * 左侧图片多宽
+   * 右侧按钮多宽
+   *
+   * 都会处于整个 rating-header
+   * 的几何中心位置。
+   */
+  grid-template-columns:
+    minmax(0, 1fr)
+    auto
+    minmax(0, 1fr);
+
   align-items: center;
 
-  gap: 20px;
+  column-gap: 32px;
+}
 
+/* =========================
+   左侧图片区域
+========================= */
+
+.header-image-area {
   min-width: 0;
+
+  justify-self: start;
+
+  display: flex;
+  align-items: center;
 }
 
 .item-image {
@@ -674,32 +697,50 @@ onBeforeUnmount(() => {
   background: #f5f7fa;
 
   cursor: pointer;
+
+  box-sizing: border-box;
 }
 
-.item-info {
-  flex: 1;
+/* =========================
+   Header 中间项目信息
+========================= */
 
+.header-center {
   min-width: 0;
+
+  justify-self: center;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
 }
 
 .title-row {
   display: flex;
   align-items: center;
+  justify-content: center;
 
   gap: 12px;
+
+  max-width: 600px;
 }
 
 .rating-title {
   margin: 0;
 
   min-width: 0;
+  max-width: 420px;
 
   overflow: hidden;
 
   color: #303133;
 
-  font-size: 24px;
+  font-size: 32px;
   font-weight: 600;
+  line-height: 32px;
 
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -708,23 +749,34 @@ onBeforeUnmount(() => {
 .description {
   margin-top: 10px;
 
-  max-width: 900px;
+  max-width: 520px;
+
+  overflow: hidden;
 
   color: #606266;
 
-  font-size: 14px;
+  font-size: 18px;
   line-height: 22px;
+
+  text-align: center;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* =========================
+   右侧操作区域
+========================= */
+
 .header-actions {
-  flex-shrink: 0;
+  min-width: 0;
+
+  justify-self: end;
 
   display: flex;
   align-items: center;
 
   gap: 12px;
-
-  padding-top: 42px;
 }
 
 /* =========================
@@ -781,7 +833,7 @@ onBeforeUnmount(() => {
 }
 
 /* =========================
-   实时平均分区域
+   实时评分区域
 ========================= */
 
 .score-panel {
@@ -828,15 +880,6 @@ onBeforeUnmount(() => {
   letter-spacing: -2px;
 }
 
-.score-total {
-  margin-left: 14px;
-
-  color: #909399;
-
-  font-size: 24px;
-  font-weight: 400;
-}
-
 .score-empty {
   margin-top: 28px;
 
@@ -865,8 +908,10 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-/* 区分专家和大众时：
-   左 / 中 / 右三栏布局。 */
+/*
+ * 区分专家和大众时：
+ * 左 / 中 / 右三栏布局。
+ */
 .score-overview-distinguish {
   display: grid;
 
@@ -1060,6 +1105,52 @@ onBeforeUnmount(() => {
 
   font-size: 18px;
   font-weight: 600;
+}
+
+/* =========================
+   小屏幕适配
+========================= */
+
+@media (max-width: 900px) {
+  .rating-header {
+    padding: 20px;
+  }
+
+  .header-main {
+    grid-template-columns: 1fr;
+
+    row-gap: 18px;
+  }
+
+  .header-image-area,
+  .header-center,
+  .header-actions {
+    justify-self: center;
+  }
+
+  .header-actions {
+    justify-content: center;
+  }
+
+  .rating-content {
+    padding: 20px;
+  }
+
+  .score-panel {
+    padding: 32px 20px;
+  }
+
+  .score-overview-distinguish {
+    grid-template-columns: 1fr;
+
+    width: 100%;
+
+    gap: 24px;
+  }
+
+  .reviewer-stat {
+    width: 100%;
+  }
 }
 
 @keyframes running-pulse {
