@@ -67,21 +67,80 @@ import { ElMessage } from 'element-plus'
 
 import { useRoute, useRouter } from 'vue-router'
 
-import * as echarts from 'echarts'
+/* =========================
+   ECharts 按需引入
+========================= */
+
+/**
+ * 只引入 ECharts 核心能力。
+ *
+ * 不再使用：
+ *
+ * import * as echarts from 'echarts'
+ *
+ * 避免把完整 ECharts 打入
+ * RatingStatics 页面 chunk。
+ */
+import * as echarts from 'echarts/core'
+
+/**
+ * 当前页面只使用柱状图。
+ */
+import { BarChart } from 'echarts/charts'
+
+/**
+ * 当前页面使用：
+ *
+ * - Grid 直角坐标系
+ * - Tooltip 提示框
+ */
+import { GridComponent, TooltipComponent } from 'echarts/components'
+
+/**
+ * 使用 Canvas 渲染器。
+ *
+ * 按需引入 ECharts 时，
+ * Renderer 必须显式注册。
+ */
+import { CanvasRenderer } from 'echarts/renderers'
+
+/**
+ * ECharts Option 类型。
+ */
+import type { ComposeOption } from 'echarts/core'
+
+import type { BarSeriesOption } from 'echarts/charts'
+
+import type { GridComponentOption, TooltipComponentOption } from 'echarts/components'
 
 import type { RatingTopicItemStatistic, RatingTopicStatistics } from '@/types'
 
 import { getRatingTopicStatistics } from '@/api/rating/RatingTopic.ts'
 
+/**
+ * 注册当前页面实际使用的 ECharts 模块。
+ *
+ * 必须在 echarts.init() 之前执行。
+ */
+echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
+
+/**
+ * 当前页面 ECharts Option 类型。
+ *
+ * 只声明实际使用的组件，
+ * 同时保留完整 TypeScript 类型检查。
+ */
+type ECOption = ComposeOption<BarSeriesOption | GridComponentOption | TooltipComponentOption>
+
 const route = useRoute()
 
 const router = useRouter()
 
+/* =========================
+   图表颜色配置
+========================= */
+
 /**
- * =========================
- * 图表颜色配置
- * =========================
- *
  * 后续需要修改排行榜整体颜色时，
  * 通常只需要修改 baseColor。
  */
@@ -127,8 +186,11 @@ const chartRef = ref<HTMLDivElement | null>(null)
 
 /**
  * ECharts 实例。
+ *
+ * 使用 ReturnType 避免依赖完整 ECharts
+ * namespace 中的实例类型。
  */
-let chartInstance: echarts.ECharts | null = null
+let chartInstance: ReturnType<typeof echarts.init> | null = null
 
 /**
  * Topic 统计数据。
@@ -251,6 +313,9 @@ function renderChart() {
     return
   }
 
+  /**
+   * 页面首次进入时创建 ECharts 实例。
+   */
   if (!chartInstance) {
     chartInstance = echarts.init(element)
   }
@@ -277,7 +342,7 @@ function renderChart() {
    *
    * itemId -> 有效排名索引
    *
-   * 这样颜色梯度与真正的评分排名绑定，
+   * 颜色梯度与真正的评分排名绑定，
    * 不依赖暂无评分 Item 所在的位置。
    */
   const ratedIndexMap = new Map<number, number>()
@@ -358,7 +423,7 @@ function renderChart() {
     CHART_COLOR_CONFIG.hoverShadowOpacity,
   )
 
-  const option: echarts.EChartsOption = {
+  const option: ECOption = {
     /**
      * 初始动画。
      */
